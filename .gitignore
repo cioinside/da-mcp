@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.env
+.env.local
+tessdata/
+.tess-cache/
+/tmp/da-mcp-*.png
+/tmp/da-mcp-*.json
+/tmp/da-mcp-*.jsonl
+/tmp/da-mcp-manual-qa/
+
+# Tooling / runtime artifacts (not project source)
+.omo/
+.opencode/
+.codegraph/
+.codegraph

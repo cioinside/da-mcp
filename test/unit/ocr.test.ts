@@ -1,0 +1,186 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { initConfig, getConfig, resetConfig } from '../../src/config.js'
+import { DaMcpError } from '../../src/errors.js'
+import { runOcr } from '../../src/ocr/index.js'
+import { classifyUiElements } from '../../src/ocr/classify.js'
+import type { OCRLine, UIElement } from '../../src/ocr/types.js'
+
+const TRACKED = ['DA_MCP_TEST_MODE'] as const
+type TrackedKey = (typeof TRACKED)[number]
+let savedEnv: Record<TrackedKey, string | undefined>
+
+beforeEach(() => {
+  savedEnv = {
+    DA_MCP_TEST_MODE: process.env['DA_MCP_TEST_MODE'],
+  }
+  process.env['DA_MCP_TEST_MODE'] = 'mock'
+  resetConfig()
+  initConfig({ DA_MCP_TEST_MODE: 'mock' })
+  expect(getConfig().testMode).toBe('mock')
+})
+
+afterEach(() => {
+  resetConfig()
+  for (const k of TRACKED) {
+    if (savedEnv[k] === undefined) delete process.env[k]
+    else process.env[k] = savedEnv[k]
+  }
+})
+
+/** Capture a thrown value for DaMcpError code assertions. */
+async function captureThrown(p: Promise<unknown>): Promise<unknown> {
+  try {
+    await p
+    return undefined
+  } catch (e) {
+    return e
+  }
+}
+
+function assertCode(caught: unknown, code: string): void {
+  expect(DaMcpError.is(caught)).toBe(true)
+  if (DaMcpError.is(caught)) {
+    expect(caught.code).toBe(code)
+  }
+}
+
+const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0])
+
+describe('runOcr (mock mode)', () => {
+  it('returns OCRResult with at least 2 lines', async () => {
+    const result = await runOcr({ image: PNG_HEADER })
+    expect(result.lines.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('fixture has OK and 123 as the first word of each line', async () => {
+    const result = await runOcr({ image: PNG_HEADER })
+    const first = result.lines[0]
+    const second = result.lines[1]
+    expect(first).toBeDefined()
+    expect(second).toBeDefined()
+    if (first === undefined || second === undefined) return
+    expect(first.words[0]?.text).toBe('OK')
+    expect(second.words[0]?.text).toBe('123')
+  })
+
+  it('rejects empty image buffer with INVALID_ARGUMENT', async () => {
+    const caught = await captureThrown(runOcr({ image: Buffer.alloc(0) }))
+    assertCode(caught, 'INVALID_ARGUMENT')
+  })
+
+  it('rejects non-Buffer image with INVALID_ARGUMENT', async () => {
+    const caught = await captureThrown(
+      runOcr({ image: 'not-a-buffer' as unknown as Buffer }),
+    )
+    assertCode(caught, 'INVALID_ARGUMENT')
+  })
+})
+
+describe('classifyUiElements', () => {
+  it('returns at least one UIElement for the OCR fixture lines', async () => {
+    const result = await runOcr({ image: PNG_HEADER })
+    const elements = classifyUiElements(result.lines)
+    expect(elements.length).toBeGreaterThanOrEqual(1)
+    for (const el of elements) {
+      expect(el.bbox.width).toBeGreaterThan(0)
+      expect(el.bbox.height).toBeGreaterThan(0)
+    }
+  })
+
+  it('classifies a short-text high-aspect line as button or label with confidence > 0.5', () => {
+    const line: OCRLine = {
+      bbox: { x: 10, y: 10, width: 80, height: 20 },
+      words: [
+        { text: 'OK', bbox: { x: 10, y: 10, width: 40, height: 20 }, confidence: 0.95 },
+      ],
+      text: 'OK',
+      confidence: 0.95,
+    }
+    const [el] = classifyUiElements([line])
+    expect(el).toBeDefined()
+    if (el === undefined) return
+    expect(['button', 'label']).toContain(el.kind)
+    expect(el.confidence).toBeGreaterThan(0.5)
+  })
+
+  it('returns an empty array for empty input', () => {
+    const result: readonly UIElement[] = classifyUiElements([])
+    expect(result.length).toBe(0)
+  })
+
+  it('preserves input order and emits one element per line', () => {
+    const lines: OCRLine[] = [
+      {
+        bbox: { x: 0, y: 0, width: 50, height: 20 },
+        words: [{ text: 'A', bbox: { x: 0, y: 0, width: 25, height: 20 }, confidence: 0.9 }],
+        text: 'A',
+        confidence: 0.9,
+      },
+      {
+        bbox: { x: 0, y: 30, width: 60, height: 20 },
+        words: [{ text: 'B', bbox: { x: 0, y: 30, width: 30, height: 20 }, confidence: 0.9 }],
+        text: 'B',
+        confidence: 0.9,
+      },
+      {
+        bbox: { x: 0, y: 60, width: 70, height: 20 },
+        words: [{ text: 'C', bbox: { x: 0, y: 60, width: 35, height: 20 }, confidence: 0.9 }],
+        text: 'C',
+        confidence: 0.9,
+      },
+    ]
+    const elements = classifyUiElements(lines)
+    expect(elements.length).toBe(3)
+    expect(elements[0]?.bbox.y).toBe(0)
+    expect(elements[1]?.bbox.y).toBe(30)
+    expect(elements[2]?.bbox.y).toBe(60)
+  })
+})
+
+describe('runOcr OCR_FAILED (CLI ENOENT + wasm unavailable)', () => {
+  it('throws DaMcpError OCR_FAILED with cliErr as cause when both backends fail', async () => {
+    resetConfig()
+    initConfig({ DA_MCP_TEST_MODE: 'real', DA_MCP_OCR_BACKEND: 'cli' })
+    expect(getConfig().testMode).toBe('real')
+    expect(getConfig().ocrBackend).toBe('cli')
+
+    // Simulate tesseract CLI missing on PATH.
+    vi.doMock('node:child_process', async () => {
+      const actual =
+        await vi.importActual<typeof import('node:child_process')>('node:child_process')
+      return {
+        ...actual,
+        spawnSync: () => ({
+          status: null,
+          signal: null,
+          output: [],
+          pid: 0,
+          stdout: '',
+          stderr: '',
+          error: Object.assign(new Error('spawnSync tesseract ENOENT'), {
+            code: 'ENOENT' as const,
+          }),
+        }),
+      }
+    })
+
+    // Simulate tesseract.js not installed.
+    vi.doMock('tesseract.js', () => {
+      throw new Error("Cannot find module 'tesseract.js'")
+    })
+
+    try {
+      const caught = await captureThrown(runOcr({ image: PNG_HEADER }))
+      assertCode(caught, 'OCR_FAILED')
+      if (DaMcpError.is(caught)) {
+        expect(caught.message).toContain('OCR failed')
+        expect(caught.cause).toBeInstanceOf(Error)
+      }
+    } finally {
+      vi.doUnmock('node:child_process')
+      vi.doUnmock('tesseract.js')
+      resetConfig()
+      initConfig({ DA_MCP_TEST_MODE: 'mock' })
+    }
+  })
+})

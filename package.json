@@ -1,0 +1,44 @@
+{
+  "name": "da-mcp",
+  "version": "0.1.0",
+  "description": "Crossplatform Desktop Automation MCP Server — screenshot, OCR with UI-element classification, mouse/keyboard control, program launch for AI agents on Linux/macOS/Windows",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "bin": {
+    "da-mcp": "./dist/server.js"
+  },
+  "main": "./dist/server.js",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/core": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "node-screenshots": "0.2.8",
+    "open": "11.0.0",
+    "robotjs": "0.8.0",
+    "screenshot-desktop": "1.15.4",
+    "tesseract.js": "7.0.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.2",
+    "tsx": "4.23.5",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  },
+  "keywords": ["mcp", "model-context-protocol", "desktop-automation", "ocr", "tesseract", "screenshot", "ai-agent"],
+  "license": "MIT",
+  "author": "da-mcp contributors",
+  "files": ["dist", "README.md", "LICENSE"]
+}
