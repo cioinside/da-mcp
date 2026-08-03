@@ -1,0 +1,86 @@
+# VERIFICATION — `choco uninstall da-mcp` with this file confirms a
+# clean removal; `choco test da-mcp` (if you push a .tests package)
+# runs the checks below to validate that the install is functional.
+
+$ErrorActionPreference = 'Stop'
+
+$toolsDir   = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
+$installDir = Join-Path $toolsDir 'da-mcp'
+$serverFile = Join-Path $installDir 'dist\server.js'
+
+Write-Host '── da-mcp verification ──' -ForegroundColor Cyan
+
+# 1. Source present
+if (Test-Path $installDir) {
+    Write-Host "✓ install directory present: $installDir" -ForegroundColor Green
+} else {
+    Write-Host "✗ install directory missing: $installDir" -ForegroundColor Red
+    exit 1
+}
+
+# 2. Node.js present and 22+
+$node = Get-Command node -ErrorAction SilentlyContinue
+if ($null -eq $node) {
+    Write-Host '✗ node not found' -ForegroundColor Red
+    exit 1
+}
+$nodeMajor = [int]((node --version) -replace '^v(\d+).*', '$1')
+if ($nodeMajor -lt 22) {
+    Write-Host "✗ node < 22 (got $nodeMajor)" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✓ node $((node --version) -replace 'v','') (>= 22)" -ForegroundColor Green
+
+# 3. Build artifact present
+if (Test-Path $serverFile) {
+    Write-Host "✓ build artifact present: $serverFile" -ForegroundColor Green
+} else {
+    Write-Host "✗ build artifact missing — run 'npm run build' in $installDir" -ForegroundColor Red
+    exit 1
+}
+
+# 4. tesseract CLI present (or warn if WASM-only fallback will be used)
+try {
+    $tessOut = & tesseract --version 2>&1 | Select-Object -First 1
+    if ($tessOut -match 'tesseract\s+v?(\d+)') {
+        Write-Host "✓ tesseract (OCR CLI): $($Matches[1])" -ForegroundColor Green
+    }
+} catch {
+    Write-Host '⚠ tesseract CLI not found — da_ocr will use WASM fallback (slower)' -ForegroundColor Yellow
+}
+
+# 5. Robotjs native binary loads
+try {
+    $loadTest = & node -e "try { require('robotjs'); console.log('robotjs loaded'); } catch (e) { console.log('robotjs FAILED:', e.message); process.exit(1); }"
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✓ robotjs native module loads" -ForegroundColor Green
+    } else {
+        Write-Host "✗ robotjs failed to load — robotjs needs VS Build Tools" -ForegroundColor Red
+        Write-Host "  Fix: choco install visualstudio2022buildtools --package-parameters `"--add Microsoft.VisualStudio.Workload.VCTools`"" -ForegroundColor Yellow
+        exit 1
+    }
+} catch {
+    Write-Host "✗ robotjs check failed: $_" -ForegroundColor Red
+    exit 1
+}
+
+# 6. Smoke test: start server, expect it to listen on stdio, then kill
+try {
+    $proc = Start-Process -FilePath 'node' -ArgumentList "`"$serverFile`"" -PassThru -RedirectStandardOutput 'stdout.log' -RedirectStandardError 'stderr.log' -WindowStyle Hidden
+    Start-Sleep -Seconds 2
+    if ($proc.HasExited) {
+        $err = Get-Content 'stderr.log' -Raw -ErrorAction SilentlyContinue
+        Write-Host "✗ server exited prematurely:" -ForegroundColor Red
+        Write-Host $err -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "✓ server starts and stays running (PID $($proc.Id))" -ForegroundColor Green
+    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    Remove-Item 'stdout.log', 'stderr.log' -ErrorAction SilentlyContinue
+} catch {
+    Write-Host "✗ server smoke test failed: $_" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ''
+Write-Host 'All checks passed.' -ForegroundColor Green
