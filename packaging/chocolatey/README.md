@@ -12,6 +12,30 @@ That single command provisions Node.js 22+, tesseract, downloads the source, run
 $env:ChocolateyInstall\lib\da-mcp\tools\da-mcp\dist\server.js
 ```
 
+After install, the script also pre-generates an HTTP transport auth token (stored at `%APPDATA%\da-mcp\token`) and prints the URL so you can opt into HTTP mode without re-running `token regenerate`.
+
+## HTTP transport
+
+The default transport is stdio. To use HTTP, set `DA_MCP_TRANSPORT=http` and start the server:
+
+```powershell
+$env:DA_MCP_TRANSPORT = 'http'
+& "$env:ChocolateyInstall\lib\da-mcp\tools\da-mcp\dist\server.js"
+```
+
+The server binds to `127.0.0.1:3000` by default. Override with `DA_MCP_HTTP_HOST` and `DA_MCP_PORT`. See the main [HTTP transport section](../../GUIDE.md#http-transport-opt-in-token-protected) in the user guide for token rotation and curl examples.
+
+Rotate or wipe the token:
+
+```powershell
+# Rotate (prints new URL)
+& "$env:ChocolateyInstall\lib\da-mcp\tools\da-mcp\dist\server.js" token regenerate
+
+# Wipe on uninstall
+$env:DA_MCP_REMOVE_TOKEN = '1'
+choco uninstall da-mcp
+```
+
 ## Files in this folder
 
 | File | Purpose |

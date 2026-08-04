@@ -15,9 +15,10 @@ This guide complements `README.md` — README is the high-level overview, this d
 5. [Install on macOS](#install-on-macos)
 6. [Install on Windows](#install-on-windows)
 7. [Configure your MCP client](#configure-your-mcp-client)
-8. [Verify the installation](#verify-the-installation)
-9. [Troubleshooting](#troubleshooting)
-10. [Update and uninstall](#update-and-uninstall)
+8. [HTTP transport (opt-in, token-protected)](#http-transport-opt-in-token-protected)
+9. [Verify the installation](#verify-the-installation)
+10. [Troubleshooting](#troubleshooting)
+11. [Update and uninstall](#update-and-uninstall)
 
 ---
 
@@ -373,6 +374,68 @@ For active development, skip the build step and run from source:
 ```
 
 **Restart the MCP client** after any config change — the server is launched on demand and won't pick up new config mid-session.
+
+---
+
+## HTTP transport (opt-in, token-protected)
+
+By default the server speaks MCP over stdio. For scenarios where stdio is inconvenient (remote access from a browser tool, network proxying, multi-machine automation), `da-mcp` also exposes an HTTP transport. The URL is **token-protected** — a 256-bit random token is the only authentication required.
+
+### Enable it
+
+```bash
+DA_MCP_TRANSPORT=http node /absolute/path/to/da-mcp/dist/server.js
+```
+
+On first start the server generates a token, persists it to disk with mode `0o600` (owner-only), and prints the full URL:
+
+```
+http://127.0.0.1:3000/<43-char-base64url-token>
+```
+
+Token storage location:
+
+| OS | Path |
+|---|---|
+| Linux | `$XDG_CONFIG_HOME/da-mcp/token` (default `~/.config/da-mcp/token`) |
+| macOS | `~/Library/Application Support/da-mcp/token` |
+| Windows | `%APPDATA%\da-mcp\token` |
+
+### Rotate the token
+
+```bash
+node /absolute/path/to/da-mcp/dist/server.js token regenerate
+# → http://127.0.0.1:3000/<new-token>
+```
+
+Anyone with the old token loses access immediately. Update your HTTP client to the new URL.
+
+### Calling from an MCP HTTP client
+
+The server speaks MCP-over-HTTP using the standard `Content-Type: application/json` + JSON-RPC 2.0 envelope. Example with `curl`:
+
+```bash
+TOKEN=...   # the 43-char token from the URL above
+curl -X POST http://127.0.0.1:3000/$TOKEN \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+Wrong / missing token → `401 Unauthorized`. Wrong path prefix → `404`.
+
+### Customisation
+
+| Env var | Default | Notes |
+|---|---|---|
+| `DA_MCP_HTTP_HOST` | `127.0.0.1` | Bind address. IPv4, IPv6 (`[::1]`), and hostnames supported. |
+| `DA_MCP_PORT` | `3000` | TCP port. |
+| `DA_MCP_TOKEN_PATH` | OS default | Override token storage (e.g. shared volume, mounted secret). |
+
+### Security notes
+
+- The default `127.0.0.1` bind means **only local processes can reach the server**. Do not expose this to a LAN or the internet without adding an upstream auth proxy (e.g. mTLS reverse proxy).
+- The token grants **full tool access** — it is bearer-style, not scoped. Treat it like an API key.
+- Uninstall scripts accept `-RemoveToken` (Windows) or `DA_MCP_REMOVE_TOKEN=1` (Chocolatey) to wipe the file.
 
 ---
 

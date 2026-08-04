@@ -7,12 +7,12 @@
     "node": ">=22.0.0"
   },
   "bin": {
-    "da-mcp": "./dist/server.js"
+    "da-mcp": "./dist/server-dispatch.js"
   },
-  "main": "./dist/server.js",
+  "main": "./dist/server-dispatch.js",
   "scripts": {
-    "start": "tsx src/server.ts",
-    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server-dispatch.ts",
+    "dev": "tsx watch src/server-dispatch.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

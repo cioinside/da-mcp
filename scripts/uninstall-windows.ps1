@@ -22,6 +22,10 @@
     Also uninstall tesseract, Node.js, and VS Build Tools.
     DANGEROUS — these are system-wide. Use with care.
 
+.PARAMETER RemoveToken
+    Also delete the HTTP auth token file (%APPDATA%\da-mcp\token).
+    The next server start will mint a new one.
+
 .PARAMETER McpConfigPath
     Additional MCP client config files to clean (Array of paths).
 
@@ -39,12 +43,17 @@
 .EXAMPLE
     # Custom install dir
     .\uninstall-windows.ps1 -InstallDir "C:\Tools\da-mcp"
+
+.EXAMPLE
+    # Also delete the HTTP auth token
+    .\uninstall-windows.ps1 -RemoveToken
 #>
 [CmdletBinding()]
 param(
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA 'da-mcp'),
     [switch]$RemoveMcpConfig,
     [switch]$RemoveSystemDeps,
+    [switch]$RemoveToken,
     [string[]]$McpConfigPath = @()
 )
 
@@ -82,7 +91,20 @@ if (Test-Path $InstallDir) {
     Write-Warn "$InstallDir not found (already gone?)"
 }
 
-# ─── Step 3: Clean MCP client configs ────────────────────────────────────────
+# ─── Step 3: Remove HTTP auth token (if requested) ───────────────────────────
+if ($RemoveToken) {
+    $tokenPath = Join-Path $env:APPDATA 'da-mcp\token'
+    if (Test-Path $tokenPath) {
+        Remove-Item -Path $tokenPath -Force
+        Write-Success "Removed token: $tokenPath"
+    } else {
+        Write-Warn "No token file at $tokenPath (already gone?)"
+    }
+} else {
+    Write-Info 'HTTP auth token left in place (-RemoveToken to delete).'
+}
+
+# ─── Step 4: Clean MCP client configs ────────────────────────────────────────
 if ($RemoveMcpConfig) {
     Write-Info 'Cleaning MCP client configs...'
 
@@ -124,7 +146,7 @@ if ($RemoveMcpConfig) {
     }
 }
 
-# ─── Step 4: Remove system deps (if requested) ───────────────────────────────
+# ─── Step 5: Remove system deps (if requested) ───────────────────────────────
 if ($RemoveSystemDeps) {
     Write-Info 'Uninstalling system deps...'
 

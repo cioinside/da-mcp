@@ -158,9 +158,8 @@ function installShutdown(server: McpServer): {
 }
 
 /**
- * Boot the MCP server over stdio, install signal handlers, and return a
- * promise that resolves when server.close() completes (or rejects on
- * connect failure).
+ * Boot over stdio, install signal handlers, resolve on close / reject on
+ * connect failure.
  */
 export function runServer(): Promise<void> {
   try {
@@ -190,13 +189,76 @@ export function runServer(): Promise<void> {
     .then(() => closed)
 }
 
-// CLI guard: when run directly, boot the server. Re-export prevents dead-code
-// elimination of `InMemoryTransport` in case external test scripts import it
-// from this module.
-export { InMemoryTransport }
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runServer().catch((err: unknown) => {
-    process.stderr.write(`da-mcp fatal: ${String(err)}\n`)
-    process.exit(1)
-  })
+/**
+ * Boot over HTTP with token-in-path auth; resolves on SIGINT/SIGTERM close.
+ */
+export function runHttpServer(): Promise<void> {
+  const cfg = (() => {
+    try {
+      return getConfig()
+    } catch {
+      return initConfig()
+    }
+  })()
+  return import('./transport/index.js')
+    .then(async ({ startHttpServer }) => {
+      const { loadOrCreateToken } = await import('./auth/index.js')
+      const token = await loadOrCreateToken(
+        cfg.tokenPath.length > 0 ? cfg.tokenPath : undefined,
+      )
+      const handle = await startHttpServer({
+        port: cfg.httpPort,
+        host: cfg.httpHost,
+        token,
+        createServer: createMcpServer,
+      })
+      getLogger().info('da-mcp http server started', {
+        component: 'server',
+        context: {
+          transport: 'http',
+          url: handle.url,
+          protocol: PROTOCOL_VERSION,
+        },
+      })
+      return new Promise<void>((resolve) => {
+        const shutdown = (signal: NodeJS.Signals): void => {
+          getLogger().info('da-mcp http shutdown signal received', {
+            component: 'server',
+            context: { signal },
+          })
+          handle.close().then(resolve, (err: unknown) => {
+            getLogger().error('da-mcp http server close failed', {
+              context: { err: String(err) },
+            })
+            resolve()
+          })
+        }
+        process.once('SIGINT', shutdown)
+        process.once('SIGTERM', shutdown)
+      })
+    })
 }
+
+/**
+ * CLI subcommand `token regenerate` (or `generate`); prints the full URL.
+ */
+export async function runTokenRegenerate(): Promise<void> {
+  const cfg = (() => {
+    try {
+      return getConfig()
+    } catch {
+      return initConfig()
+    }
+  })()
+  const { regenerateToken, getServerUrl } = await import('./auth/index.js')
+  const token = await regenerateToken(
+    cfg.tokenPath.length > 0 ? cfg.tokenPath : undefined,
+  )
+  // CLI surface — stdout, not stderr.
+  process.stdout.write(`${getServerUrl(token, cfg.httpHost, cfg.httpPort)}\n`)
+}
+
+// Re-export of InMemoryTransport prevents dead-code elimination for test
+// scripts that import it from this module. CLI dispatch lives in
+// server-dispatch.ts to keep this file under the 250 LOC ceiling.
+export { InMemoryTransport }

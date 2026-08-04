@@ -87,7 +87,34 @@ DA_MCP_TEST_MODE=mock npm test
 
 ## Run
 
+### stdio (default)
+
 The server speaks MCP over stdio. Configure your MCP client to launch `node /projects/da-mcp/dist/server.js` (or `npx tsx src/server.ts` for dev).
+
+### HTTP (opt-in, token-protected)
+
+Set `DA_MCP_TRANSPORT=http` to expose the server on `http://127.0.0.1:3000/<token>`. A 256-bit random token is generated on first start and persisted at:
+
+| OS | Token path |
+|---|---|
+| Linux | `$XDG_CONFIG_HOME/da-mcp/token` or `~/.config/da-mcp/token` |
+| macOS | `~/Library/Application Support/da-mcp/token` |
+| Windows | `%APPDATA%\da-mcp\token` |
+
+The token file is created with mode `0o600` (owner-only). Rotate it any time:
+
+```bash
+node /projects/da-mcp/dist/server.js token regenerate
+# → http://127.0.0.1:3000/<43-char-base64url-token>
+```
+
+Override defaults with env vars:
+
+- `DA_MCP_HTTP_HOST` — bind address (default `127.0.0.1`); supports IPv4, IPv6 (`[::1]`), and hostname
+- `DA_MCP_PORT` — port (default `3000`)
+- `DA_MCP_TOKEN_PATH` — override token storage path
+
+The URL is **unauthenticated token** (bearer-style): anyone with the token can call tools. Bind only to `127.0.0.1` (default) — do not expose this to a network without adding an upstream auth proxy.
 
 ### OpenCode / Claude Desktop example config
 
@@ -155,6 +182,10 @@ npx vitest
 - `DA_MCP_OCR_BACKEND` — `cli` (default) or `wasm`
 - `DA_MCP_TEST_MODE` — `mock` skips real native calls in tests; e2e tests skip when set
 - `DA_MCP_SCREENSHOT_BACKEND` — force a screenshot backend (`node-screenshots` | `screenshot-desktop` | `windows-cli`); default auto-detect
+- `DA_MCP_TRANSPORT` — `stdio` (default) or `http`; `http` enables the opt-in HTTP transport
+- `DA_MCP_PORT` — HTTP port when `DA_MCP_TRANSPORT=http` (default `3000`)
+- `DA_MCP_HTTP_HOST` — HTTP bind address (default `127.0.0.1`); supports IPv4, IPv6, hostname
+- `DA_MCP_TOKEN_PATH` — override the auth token storage path
 
 ## License
 

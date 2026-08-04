@@ -28,11 +28,21 @@ export interface Config {
   maxTypeBytes: number
   /** Maximum milliseconds to wait for a native subprocess before killing it. */
   subprocessTimeoutMs: number
+  /** Transport to bind. 'stdio' (default) | 'http'. */
+  transport: 'stdio' | 'http'
+  /** TCP port for HTTP transport. Default: 3000. */
+  httpPort: number
+  /** Host / interface for HTTP transport. Default: '127.0.0.1' (loopback only). */
+  httpHost: string
+  /** Override path for the auth token file. Empty = resolve at runtime. */
+  tokenPath: string
 }
 
 const LOG_LEVELS: readonly LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error']
 const OCR_BACKENDS: readonly ('cli' | 'wasm')[] = ['cli', 'wasm']
 const TEST_MODES: readonly ('real' | 'mock')[] = ['real', 'mock']
+const TRANSPORTS: readonly ('stdio' | 'http')[] = ['stdio', 'http']
+const HOST_PATTERN = /^[a-zA-Z0-9.\-:\[\]]+$/
 
 function readNonEmpty(env: NodeJS.ProcessEnv, key: string): string | null {
   const v = env[key]
@@ -113,6 +123,32 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       ? pickPositiveInt(subprocessTimeoutRaw, 'DA_MCP_SUBPROCESS_TIMEOUT_MS')
       : 30000
 
+  const transportRaw = env['DA_MCP_TRANSPORT']
+  const transport =
+    transportRaw !== undefined && transportRaw.length > 0
+      ? pickEnum(transportRaw, TRANSPORTS, 'DA_MCP_TRANSPORT')
+      : 'stdio'
+
+  const httpPortRaw = env['DA_MCP_PORT']
+  const httpPort =
+    httpPortRaw !== undefined && httpPortRaw.length > 0
+      ? pickPositiveInt(httpPortRaw, 'DA_MCP_PORT')
+      : 3000
+
+  const httpHostRaw = env['DA_MCP_HTTP_HOST']
+  const httpHost =
+    httpHostRaw !== undefined && httpHostRaw.length > 0 ? httpHostRaw : '127.0.0.1'
+  if (!HOST_PATTERN.test(httpHost)) {
+    throw new DaMcpError(
+      'INVALID_ARGUMENT',
+      `DA_MCP_HTTP_HOST: invalid value "${httpHost}", expected alphanumeric, dots, dashes, colons, or brackets`,
+    )
+  }
+
+  const tokenPathRaw = env['DA_MCP_TOKEN_PATH']
+  const tokenPath =
+    tokenPathRaw !== undefined && tokenPathRaw.length > 0 ? tokenPathRaw : ''
+
   return {
     display,
     waylandDisplay,
@@ -123,6 +159,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     tessdataDir,
     maxTypeBytes,
     subprocessTimeoutMs,
+    transport,
+    httpPort,
+    httpHost,
+    tokenPath,
   }
 }
 

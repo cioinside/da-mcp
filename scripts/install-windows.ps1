@@ -325,5 +325,24 @@ Write-Host '  Run from source (dev mode, no build):' -ForegroundColor Cyan
 Write-Host "    cd $InstallDir" -ForegroundColor White
 Write-Host '    npx tsx src/server.ts' -ForegroundColor White
 Write-Host ''
+$httpUrl = ''
+if (-not $SkipBuild -and (Test-Path $serverPath)) {
+    try {
+        $env:DA_MCP_TRANSPORT = 'http'
+        $httpUrl = (& node $serverPath token regenerate).Trim()
+        Remove-Item Env:\DA_MCP_TRANSPORT -ErrorAction SilentlyContinue
+    } catch {
+        Remove-Item Env:\DA_MCP_TRANSPORT -ErrorAction SilentlyContinue
+        Write-Warn "Token pre-generation failed (continuing): $_"
+    }
+}
+if ($httpUrl) {
+    Write-Host '  HTTP transport (opt-in):' -ForegroundColor Cyan
+    Write-Host "    Generated auth token (stored in %APPDATA%\da-mcp\token):" -ForegroundColor White
+    Write-Host "    $httpUrl" -ForegroundColor White
+    Write-Host "    Start: \$env:DA_MCP_TRANSPORT='http'; node '$serverPath'" -ForegroundColor White
+    Write-Host "    Regenerate token: node '$serverPath' token regenerate" -ForegroundColor White
+    Write-Host ''
+}
 Write-Host '  Uninstall: run scripts\uninstall-windows.ps1' -ForegroundColor DarkGray
 Write-Host ''

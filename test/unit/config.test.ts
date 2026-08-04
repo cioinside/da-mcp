@@ -13,6 +13,10 @@ const ALL_VARS = [
   'DA_MCP_TESSDATA_DIR',
   'DA_MCP_MAX_TYPE_BYTES',
   'DA_MCP_SUBPROCESS_TIMEOUT_MS',
+  'DA_MCP_TRANSPORT',
+  'DA_MCP_PORT',
+  'DA_MCP_HTTP_HOST',
+  'DA_MCP_TOKEN_PATH',
 ] as const
 
 let savedEnv: NodeJS.ProcessEnv
@@ -64,6 +68,10 @@ describe('loadConfig — defaults', () => {
     expect(cfg.tessdataDir).toBe('./tessdata')
     expect(cfg.maxTypeBytes).toBe(65536)
     expect(cfg.subprocessTimeoutMs).toBe(30000)
+    expect(cfg.transport).toBe('stdio')
+    expect(cfg.httpPort).toBe(3000)
+    expect(cfg.httpHost).toBe('127.0.0.1')
+    expect(cfg.tokenPath).toBe('')
   })
 })
 
@@ -125,6 +133,36 @@ describe('loadConfig — per-env-var', () => {
     expect(cfg.subprocessTimeoutMs).toBe(5000)
   })
 
+  it('DA_MCP_TRANSPORT=http sets transport=http', () => {
+    const cfg = loadConfig({ DA_MCP_TRANSPORT: 'http' })
+    expect(cfg.transport).toBe('http')
+  })
+
+  it('DA_MCP_TRANSPORT is case-insensitive (HTTP → http)', () => {
+    const cfg = loadConfig({ DA_MCP_TRANSPORT: 'HTTP' })
+    expect(cfg.transport).toBe('http')
+  })
+
+  it('DA_MCP_PORT=8080 sets httpPort=8080', () => {
+    const cfg = loadConfig({ DA_MCP_PORT: '8080' })
+    expect(cfg.httpPort).toBe(8080)
+  })
+
+  it('DA_MCP_HTTP_HOST sets httpHost', () => {
+    const cfg = loadConfig({ DA_MCP_HTTP_HOST: '0.0.0.0' })
+    expect(cfg.httpHost).toBe('0.0.0.0')
+  })
+
+  it('DA_MCP_HTTP_HOST accepts IPv6 in brackets', () => {
+    const cfg = loadConfig({ DA_MCP_HTTP_HOST: '[::1]' })
+    expect(cfg.httpHost).toBe('[::1]')
+  })
+
+  it('DA_MCP_TOKEN_PATH sets tokenPath', () => {
+    const cfg = loadConfig({ DA_MCP_TOKEN_PATH: '/etc/da-mcp.token' })
+    expect(cfg.tokenPath).toBe('/etc/da-mcp.token')
+  })
+
   it('empty string is treated as unset (DA_MCP_LOG)', () => {
     const cfg = loadConfig({ DA_MCP_LOG: '' })
     expect(cfg.logLevel).toBe('info')
@@ -148,6 +186,18 @@ describe('loadConfig — invalid enum values', () => {
   it('DA_MCP_TEST_MODE=invalid throws INVALID_ARGUMENT', () => {
     assertInvalidArgument({ DA_MCP_TEST_MODE: 'fake' }, 'DA_MCP_TEST_MODE')
   })
+
+  it('DA_MCP_TRANSPORT=invalid throws INVALID_ARGUMENT', () => {
+    assertInvalidArgument({ DA_MCP_TRANSPORT: 'tcp' }, 'DA_MCP_TRANSPORT')
+  })
+
+  it('DA_MCP_HTTP_HOST with spaces throws INVALID_ARGUMENT', () => {
+    assertInvalidArgument({ DA_MCP_HTTP_HOST: 'bad host' }, 'DA_MCP_HTTP_HOST')
+  })
+
+  it('DA_MCP_HTTP_HOST with shell metachar throws INVALID_ARGUMENT', () => {
+    assertInvalidArgument({ DA_MCP_HTTP_HOST: 'a;b' }, 'DA_MCP_HTTP_HOST')
+  })
 })
 
 describe('loadConfig — invalid numeric values', () => {
@@ -169,6 +219,18 @@ describe('loadConfig — invalid numeric values', () => {
 
   it('DA_MCP_SUBPROCESS_TIMEOUT_MS=NaN throws INVALID_ARGUMENT', () => {
     assertInvalidArgument({ DA_MCP_SUBPROCESS_TIMEOUT_MS: 'NaN' }, 'DA_MCP_SUBPROCESS_TIMEOUT_MS')
+  })
+
+  it('DA_MCP_PORT=0 throws INVALID_ARGUMENT', () => {
+    assertInvalidArgument({ DA_MCP_PORT: '0' }, 'DA_MCP_PORT')
+  })
+
+  it('DA_MCP_PORT=-1 throws INVALID_ARGUMENT', () => {
+    assertInvalidArgument({ DA_MCP_PORT: '-1' }, 'DA_MCP_PORT')
+  })
+
+  it('DA_MCP_PORT=abc throws INVALID_ARGUMENT', () => {
+    assertInvalidArgument({ DA_MCP_PORT: 'abc' }, 'DA_MCP_PORT')
   })
 })
 

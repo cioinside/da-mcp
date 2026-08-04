@@ -56,6 +56,15 @@ if ($LASTEXITCODE -ne 0) { throw "npm run build failed (exit $LASTEXITCODE)" }
 # ─── Print post-install guidance ─────────────────────────────────────────────
 $serverPath = Join-Path $installDir 'dist\server.js'
 
+$httpUrl = ''
+try {
+    $env:DA_MCP_TRANSPORT = 'http'
+    $httpUrl = (& node $serverPath token regenerate).Trim()
+    Remove-Item Env:\DA_MCP_TRANSPORT -ErrorAction SilentlyContinue
+} catch {
+    Remove-Item Env:\DA_MCP_TRANSPORT -ErrorAction SilentlyContinue
+}
+
 Write-Host ''
 Write-Host '╔════════════════════════════════════════════════════════════╗' -ForegroundColor Green
 Write-Host '║              da-mcp installed via Chocolatey              ║' -ForegroundColor Green
@@ -74,5 +83,13 @@ Write-Host '      }'                                                      -Foreg
 Write-Host '    }'                                                        -ForegroundColor White
 Write-Host '  }'                                                          -ForegroundColor White
 Write-Host ''
+if ($httpUrl) {
+    Write-Host 'HTTP transport (opt-in):' -ForegroundColor Cyan
+    Write-Host '  Token (stored in %APPDATA%\da-mcp\token):' -ForegroundColor White
+    Write-Host "  $httpUrl" -ForegroundColor White
+    Write-Host "  Start: `$env:DA_MCP_TRANSPORT='http'; node '$serverPath'" -ForegroundColor White
+    Write-Host "  Regenerate: node '$serverPath' token regenerate" -ForegroundColor White
+    Write-Host ''
+}
 Write-Host 'Quick test (verifies server starts and exits cleanly):' -ForegroundColor Cyan
 Write-Host "  Start-Process '$serverPath' -PassThru | Stop-Process"        -ForegroundColor White
