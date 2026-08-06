@@ -128,40 +128,54 @@ export async function keyTap(
   await keyboard.releaseKey(...modKeys, rkey)
 }
 
-export async function keyDown(key: KeyName): Promise<void> {
+export async function keyDown(
+  key: KeyName,
+  modifiers?: readonly Modifier[],
+): Promise<void> {
+  const mods = modifiers ?? []
   if (isMockMode()) return
   const routing = resolveRouting()
   const info = detectPlatform()
   if (routing.os === 'linux' && routing.display === 'x11') {
     requireTool(info.tools, 'xdotool', routing)
+    for (const m of mods) runCli('xdotool', ['keydown', m])
     runCli('xdotool', ['keydown', key])
     return
   }
   if (routing.os === 'linux' && routing.display === 'wayland') {
     requireTool(info.tools, 'ydotool', routing)
+    for (const m of mods) runCli('ydotool', ['keydown', m])
     runCli('ydotool', ['keydown', key])
     return
   }
   // macOS / Windows
-  await keyboard.pressKey(toNutKey(key))
+  const modKeys = mods.map(toNutModifier)
+  await keyboard.pressKey(...modKeys, toNutKey(key))
 }
 
-export async function keyUp(key: KeyName): Promise<void> {
+export async function keyUp(
+  key: KeyName,
+  modifiers?: readonly Modifier[],
+): Promise<void> {
+  const mods = modifiers ?? []
   if (isMockMode()) return
   const routing = resolveRouting()
   const info = detectPlatform()
   if (routing.os === 'linux' && routing.display === 'x11') {
     requireTool(info.tools, 'xdotool', routing)
     runCli('xdotool', ['keyup', key])
+    for (const m of mods) runCli('xdotool', ['keyup', m])
     return
   }
   if (routing.os === 'linux' && routing.display === 'wayland') {
     requireTool(info.tools, 'ydotool', routing)
     runCli('ydotool', ['keyup', key])
+    for (const m of mods) runCli('ydotool', ['keyup', m])
     return
   }
   // macOS / Windows
-  await keyboard.releaseKey(toNutKey(key))
+  const modKeys = mods.map(toNutModifier)
+  await keyboard.releaseKey(...modKeys, toNutKey(key))
 }
 
 export async function typeText(text: string, opts?: TypeOptions): Promise<void> {
