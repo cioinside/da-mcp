@@ -14,6 +14,7 @@ import {
   runHttpServer,
   runTokenRegenerate,
 } from './server.js'
+import { fileURLToPath } from 'node:url'
 
 function readTransportFromEnv(): 'stdio' | 'http' {
   return process.env['DA_MCP_TRANSPORT'] === 'http' ? 'http' : 'stdio'
@@ -39,7 +40,7 @@ export function runCli(argv: readonly string[]): Promise<void> {
   return runWithTransport()
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
   runCli(process.argv).catch((err: unknown) => {
     process.stderr.write(`da-mcp fatal: ${String(err)}\n`)
     process.exit(1)
