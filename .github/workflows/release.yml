@@ -57,7 +57,7 @@ jobs:
           - target: darwin-arm64
             os: macos-14
     runs-on: ${{ matrix.os }}
-    if: contains(env.ENABLED_TARGETS, matrix.target)
+    if: ${{ contains(env.ENABLED_TARGETS, matrix.target) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
