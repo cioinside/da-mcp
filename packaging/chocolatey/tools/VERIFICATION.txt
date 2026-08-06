@@ -49,18 +49,18 @@ try {
     Write-Host '⚠ tesseract CLI not found — da_ocr will use WASM fallback (slower)' -ForegroundColor Yellow
 }
 
-# 5. Robotjs native binary loads
+# 5. nut.js native binary loads (prebuilt libnut, no compiler needed)
 try {
-    $loadTest = & node -e "try { require('robotjs'); console.log('robotjs loaded'); } catch (e) { console.log('robotjs FAILED:', e.message); process.exit(1); }"
+    $loadTest = & node -e "try { require('@nut-tree-fork/nut-js'); console.log('nut.js loaded'); } catch (e) { console.log('nut.js FAILED:', e.message); process.exit(1); }"
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✓ robotjs native module loads" -ForegroundColor Green
+        Write-Host "✓ @nut-tree-fork/nut-js native module loads" -ForegroundColor Green
     } else {
-        Write-Host "✗ robotjs failed to load — robotjs needs VS Build Tools" -ForegroundColor Red
-        Write-Host "  Fix: choco install visualstudio2022buildtools --package-parameters `"--add Microsoft.VisualStudio.Workload.VCTools`"" -ForegroundColor Yellow
+        Write-Host "✗ nut.js failed to load: $loadTest" -ForegroundColor Red
+        Write-Host '  Try reinstalling: npm install --force @nut-tree-fork/nut-js' -ForegroundColor Yellow
         exit 1
     }
 } catch {
-    Write-Host "✗ robotjs check failed: $_" -ForegroundColor Red
+    Write-Host "✗ nut.js check failed: $_" -ForegroundColor Red
     exit 1
 }
 

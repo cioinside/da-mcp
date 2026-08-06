@@ -46,7 +46,7 @@ Highlights
 * OCR via tesseract CLI (primary) or tesseract.js WASM (fallback)
 * UI element classification: button / input / label / checkbox / radio
   / menu / menu-item / icon
-* Input: xdotool / ydotool / wtype (Linux) · robotjs (macOS / Windows)
+* Input: xdotool / ydotool / wtype (Linux) · @nut-tree-fork/nut-js (macOS / Windows)
 * Strict TypeScript + ESM, 250 LOC per file ceiling, 216 passing tests
 
 After install, point your MCP client at:

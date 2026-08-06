@@ -10,12 +10,11 @@
       1. Verifies PowerShell 5.1+ (or PowerShell 7+)
       2. Checks / installs Node.js 22+ via winget (or chocolatey)
       3. Checks / installs tesseract via winget (or chocolatey)
-      4. Checks Visual Studio Build Tools (warns if missing — robotjs needs it)
-      5. Downloads da-mcp source (git clone or ZIP)
-      6. Runs npm install (compiles robotjs native binary)
-      7. Runs npm run build
-      8. Runs npm test (mock mode — skips native calls)
-      9. Prints the path and MCP client config snippet
+      4. Downloads da-mcp source (git clone or ZIP)
+      5. Runs npm install (prebuilt libnut for input, prebuilt NAPI for node-screenshots — no native toolchain required)
+      6. Runs npm run build
+      7. Runs npm test (mock mode — skips native calls)
+      8. Prints the path and MCP client config snippet
 
     Tested on: Windows 10 21H2, Windows 11 23H2, Windows Server 2022.
     PowerShell 5.1+ required (ships with Windows 10+).
@@ -39,8 +38,8 @@
     Skip npm test
 
 .PARAMETER SkipSystemDeps
-    Do not install system-level dependencies (Node / tesseract /
-    VS Build Tools) — assume they are already present
+    Do not install system-level dependencies (Node / tesseract) —
+    assume they are already present
 
 .PARAMETER Force
     Overwrite existing install directory if present
@@ -129,7 +128,7 @@ function Install-Package {
 Write-Banner 'da-mcp installer for Windows'
 
 # ─── Step 1: PowerShell version ──────────────────────────────────────────────
-Write-Step 1 7 'Checking PowerShell version...'
+Write-Step 1 6 'Checking PowerShell version...'
 if ($PSVersionTable.PSVersion.Major -lt 5) {
     Write-Fail "PowerShell 5.0+ required (found $($PSVersionTable.PSVersion))"
     Write-Info 'Install PowerShell 7:  winget install Microsoft.PowerShell'
@@ -138,7 +137,7 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
 Write-Success "PowerShell $($PSVersionTable.PSVersion)"
 
 # ─── Step 2: Node.js 22+ ─────────────────────────────────────────────────────
-Write-Step 2 7 'Checking Node.js 22+...'
+Write-Step 2 6 'Checking Node.js 22+...'
 $needsNode = $false
 $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
 if ($null -eq $nodeCmd) {
@@ -171,7 +170,7 @@ if ($needsNode) {
 }
 
 # ─── Step 3: tesseract ───────────────────────────────────────────────────────
-Write-Step 3 7 'Checking tesseract...'
+Write-Step 3 6 'Checking tesseract...'
 $tesseractInstalled = $false
 try {
     $tessOut = & tesseract --version 2>&1 | Select-Object -First 1
@@ -196,43 +195,8 @@ if (-not $tesseractInstalled) {
     }
 }
 
-# ─── Step 4: VS Build Tools (for robotjs) ────────────────────────────────────
-Write-Step 4 7 'Checking Visual Studio Build Tools (required for robotjs)...'
-$vsWhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-$vsOk = $false
-if (Test-Path $vsWhere) {
-    $vsInstall = & $vsWhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property displayName 2>$null
-    if ($vsInstall) {
-        Write-Success "VS Build Tools: $vsInstall"
-        $vsOk = $true
-    } else {
-        Write-Warn 'VS Build Tools installed but C++ workload missing.'
-    }
-}
-if (-not $vsOk) {
-    Write-Warn 'Visual Studio Build Tools (C++ workload) not detected — robotjs may fail to build.'
-    if (-not $SkipSystemDeps) {
-        if ($env:CI -eq 'true') {
-            Write-Info 'CI mode: skipping interactive VS install. Run this on a developer machine first:'
-            Write-Info '  winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --quiet --wait" --accept-package-agreements --accept-source-agreements'
-        } else {
-            $choice = Read-Host '  Install VS Build Tools now? (~5GB, takes 10+ min) [y/N]'
-            if ($choice -eq 'y') {
-                try {
-                    Install-Package -PackageId 'Microsoft.VisualStudio.2022.BuildTools' `
-                        -WingetExtraArgs '--override "--add Microsoft.VisualStudio.Workload.VCTools --quiet --wait"'
-                    Write-Success 'VS Build Tools installed'
-                } catch {
-                    Write-Warn "VS Build Tools install failed: $_"
-                    Write-Info 'npm install will likely fail. Re-run install manually before continuing.'
-                }
-            }
-        }
-    }
-}
-
-# ─── Step 5: Download source ────────────────────────────────────────────────
-Write-Step 5 7 "Downloading da-mcp to $InstallDir ..."
+# ─── Step 4: Download source ────────────────────────────────────────────────
+Write-Step 4 6 "Downloading da-mcp to $InstallDir ..."
 if (Test-Path $InstallDir) {
     if ($Force) {
         Write-Info "Removing existing install (Force)..."
@@ -265,8 +229,8 @@ if ($UseZip -or -not (Get-Command git -ErrorAction SilentlyContinue)) {
     Write-Success 'Source cloned'
 }
 
-# ─── Step 6: npm install + build ────────────────────────────────────────────
-Write-Step 6 7 'Installing npm dependencies (robotjs compiles here, ~1-2 min)...'
+# ─── Step 5: npm install + build ────────────────────────────────────────────
+Write-Step 5 6 'Installing npm dependencies (prebuilt binaries, ~10-30s)...'
 Push-Location $InstallDir
 try {
     npm install --no-audit --no-fund
@@ -293,8 +257,8 @@ try {
     Pop-Location
 }
 
-# ─── Step 7: Print next steps ────────────────────────────────────────────────
-Write-Step 7 7 'Done — printing MCP client config...'
+# ─── Step 6: Print next steps ────────────────────────────────────────────────
+Write-Step 6 6 'Done — printing MCP client config...'
 $serverPath = Join-Path $InstallDir 'dist\server.js'
 $configJson = @{
     mcpServers = @{

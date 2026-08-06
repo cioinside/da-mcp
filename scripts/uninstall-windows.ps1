@@ -6,7 +6,7 @@
     Removes the da-mcp install directory and optionally:
       - Removes the da-mcp entry from known MCP client config files
         (Claude Desktop, OpenCode, Cursor)
-      - Removes tesseract, Node.js, VS Build Tools (DANGEROUS — affects whole system)
+      - Removes tesseract and Node.js (DANGEROUS — affects whole system)
 
     Defaults to a safe uninstall (only the project files).
 
@@ -19,7 +19,7 @@
     Pass -McpConfigPath to add custom paths.
 
 .PARAMETER RemoveSystemDeps
-    Also uninstall tesseract, Node.js, and VS Build Tools.
+    Also uninstall tesseract and Node.js.
     DANGEROUS — these are system-wide. Use with care.
 
 .PARAMETER RemoveToken
@@ -73,7 +73,6 @@ if ($RemoveSystemDeps) {
     Write-Warn 'You requested -RemoveSystemDeps. This will UNINSTALL:'
     Write-Warn '  - tesseract (UB-Mannheim.TesseractOCR)'
     Write-Warn '  - Node.js (OpenJS.NodeJS.LTS)'
-    Write-Warn '  - VS Build Tools (Microsoft.VisualStudio.2022.BuildTools)'
     Write-Warn 'These are NOT da-mcp-specific — other apps may break.'
     $confirm = Read-Host '  Type "yes" to proceed'
     if ($confirm -ne 'yes') {
@@ -151,12 +150,12 @@ if ($RemoveSystemDeps) {
     Write-Info 'Uninstalling system deps...'
 
     if (Get-Command winget -ErrorAction SilentlyContinue) {
-        @('UB-Mannheim.TesseractOCR', 'OpenJS.NodeJS.LTS', 'Microsoft.VisualStudio.2022.BuildTools') | ForEach-Object {
+        @('UB-Mannheim.TesseractOCR', 'OpenJS.NodeJS.LTS') | ForEach-Object {
             Write-Info "  winget uninstall --id $_"
             winget uninstall --id $_ --silent --accept-source-agreements 2>&1 | Out-Null
         }
     } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
-        @('tesseract', 'nodejs-lts', 'visualstudio2022buildtools') | ForEach-Object {
+        @('tesseract', 'nodejs-lts') | ForEach-Object {
             Write-Info "  choco uninstall $_ -y"
             choco uninstall $_ -y --no-progress 2>&1 | Out-Null
         }

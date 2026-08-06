@@ -24,14 +24,14 @@ This guide complements `README.md` — README is the high-level overview, this d
 
 ## Quick start
 
-If you already have **Node.js 22+**, **npm 10+**, and the platform-specific binaries (`xdotool` / `ydotool` / `robotjs` deps / `tesseract`) installed, this is the whole install:
+If you already have **Node.js 22+**, **npm 10+**, and the platform-specific binaries (`xdotool` / `ydotool` / `wtype` / `tesseract`) installed, this is the whole install:
 
 ```bash
 git clone <repo-url> da-mcp     # or: copy the project directory
 cd da-mcp
-npm install                    # compiles robotjs from source
+npm install                    # all native deps ship prebuilt binaries (libnut for macOS/Windows)
 npm run build                  # tsc → dist/
-DA_MCP_TEST_MODE=mock npm test # 286 passed | 18 skipped expected
+DA_MCP_TEST_MODE=mock npm test # 296 passed | 18 skipped expected
 ```
 
 Then point your MCP client at `node /absolute/path/to/da-mcp/dist/server-dispatch.js` and you're done.
@@ -53,10 +53,10 @@ For a guided setup, continue below.
 
 | OS | Tooling | Native build deps |
 |---|---|---|
-| Linux (X11) | `xdotool`, `x11-utils`, `tesseract-ocr` | `build-essential`, `libxtst-dev`, `libpng-dev`, `libx11-dev`, `libxkbcommon-dev`, `pkg-config`, `python3` |
-| Linux (Wayland) | `ydotool` (daemon), `wtype`, `grim`, `tesseract-ocr` | Same as X11 |
-| macOS | `tesseract` (Homebrew), Xcode CLT | `xcode-select --install` |
-| Windows | `tesseract`, VS Build Tools | Visual Studio Build Tools (C++ workload), .NET 4.5+ (for PowerShell BitBlt) |
+| Linux (X11) | `xdotool`, `x11-utils`, `tesseract-ocr` | None — all native deps ship prebuilt (`node-screenshots` NAPI, `@nut-tree-fork/nut-js` libnut) |
+| Linux (Wayland) | `ydotool` (daemon), `wtype`, `grim`, `tesseract-ocr` | None |
+| macOS | `tesseract` (Homebrew), Xcode CLT | None — Xcode CLT only needed for Homebrew itself |
+| Windows | `tesseract` | None — all native deps ship prebuilt; .NET 4.5+ (for PowerShell BitBlt) |
 
 ---
 
@@ -71,10 +71,11 @@ sudo apt update
 sudo apt install -y \
   tesseract-ocr tesseract-ocr-eng tesseract-ocr-osd \
   xdotool x11-utils \
-  libxtst-dev libpng-dev libx11-dev libxkbcommon-dev \
-  pkg-config build-essential python3 \
+  libx11-dev libxkbcommon-dev \
   git
 ```
+
+(`@nut-tree-fork/nut-js` and `node-screenshots` ship prebuilt NAPI binaries, so no C/C++ toolchain is required on Linux.)
 
 Or simply:
 
@@ -90,8 +91,8 @@ sudo ./scripts/install-system-deps.sh
 sudo dnf install -y \
   tesseract tesseract-langpack-eng \
   xdotool xorg-x11-utils \
-  gcc-c++ libXtst-devel libpng-devel libX11-devel libxkbcommon-devel \
-  pkgconfig python3 git
+  libX11-devel libxkbcommon-devel \
+  git
 ```
 
 **Arch / Manjaro**:
@@ -100,8 +101,8 @@ sudo dnf install -y \
 sudo pacman -S --noconfirm \
   tesseract tesseract-data-eng \
   xdotool xorg-x11-utils \
-  base-devel libxtst libpng libx11 libxkbcommon \
-  pkgconf python git
+  libx11 libxkbcommon \
+  git
 ```
 
 ### Step 2 — Confirm X11 is available
@@ -125,7 +126,7 @@ export DISPLAY=:0
 ```bash
 git clone <repo-url> da-mcp
 cd da-mcp
-npm install              # builds robotjs (~30–90s the first time)
+npm install              # uses prebuilt binaries (libnut for macOS/Windows, NAPI for node-screenshots)
 ```
 
 ### Step 4 — Build and verify
@@ -136,7 +137,7 @@ npm run typecheck
 DA_MCP_TEST_MODE=mock npm test
 ```
 
-Expected: `216 passed | 17 skipped (env) | 0 failed`.
+Expected: `296 passed | 18 skipped (env) | 0 failed`.
 
 ---
 
@@ -217,7 +218,7 @@ brew install node tesseract
 ```bash
 git clone <repo-url> da-mcp
 cd da-mcp
-npm install              # builds robotjs (CGEvent backend)
+npm install              # uses prebuilt libnut (CGEvent) binaries
 npm run build
 DA_MCP_TEST_MODE=mock npm test
 ```
@@ -250,21 +251,7 @@ node --version    # v22.x.x
 npm --version     # 10.x.x
 ```
 
-### Step 2 — Visual Studio Build Tools
-
-`robotjs` compiles a native SendInput DLL — you need MSVC.
-
-```powershell
-# Chocolatey
-choco install -y visualstudio2022buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools"
-
-# Or download directly:
-# https://visualstudio.microsoft.com/visual-cpp-build-tools/
-```
-
-During installation, select the **"Desktop development with C++"** workload.
-
-### Step 3 — Tesseract
+### Step 2 — Tesseract
 
 ```powershell
 choco install -y tesseract
@@ -272,7 +259,7 @@ choco install -y tesseract
 
 Or download the Windows installer from https://github.com/UB-Mannheim/tesseract/wiki. **Note the install path** — you'll need to set `DA_MCP_TESSERACT_BIN` if tesseract isn't on `$PATH`.
 
-### Step 4 — npm install + build
+### Step 3 — npm install + build
 
 ```powershell
 git clone <repo-url> da-mcp
@@ -283,7 +270,7 @@ $env:DA_MCP_TEST_MODE = "mock"
 npm test
 ```
 
-### Step 5 — (Optional) PowerShell BitBlt fallback
+### Step 4 — (Optional) PowerShell BitBlt fallback
 
 The Windows CLI backend (`windowsCliBackend` in `src/screenshot/backends.ts`) uses PowerShell with `System.Drawing.Graphics.CopyFromScreen` as a fallback if `node-screenshots` fails. It requires **.NET Framework 4.5+** (ships with Windows 10+). No additional setup needed.
 
@@ -303,6 +290,8 @@ $bmp.Save("$env:TEMP\test.png")
 ## Configure your MCP client
 
 The server speaks MCP over stdio. Every client launches it the same way: spawn `node` with the absolute path to `dist/server-dispatch.js`. Replace `/absolute/path/to/da-mcp` with the real path.
+
+> **You are the orchestrator.** da-mcp exposes 12 `da_*` tools that an MCP client invokes directly over stdio. Do NOT write a wrapper script that imports `dist/server-dispatch.js` or that spawns the server and re-issues tool calls through Node — the MCP client already handles framing, lifecycle, and JSON-RPC. If you need to drive da-mcp from your own code, prefer the MCP SDK over shelling out.
 
 ### OpenCode
 
@@ -499,23 +488,21 @@ You should receive a base64-encoded PNG. If you get an error, jump to [Troublesh
 
 ## Troubleshooting
 
-### `Cannot find module 'robotjs'` / `node-gyp` errors during `npm install`
+### `Cannot find module '@nut-tree-fork/nut-js'` / NAPI load errors during `npm install`
 
-Native module didn't compile. Check that you have the build deps for your OS:
+`@nut-tree-fork/nut-js@4.2.6` ships prebuilt libnut binaries for win-x64, linux, and darwin, so `npm install` should "just work" without a C/C++ toolchain. If the load fails:
 
-| OS | Required |
-|---|---|
-| Linux | `build-essential`, `libxtst-dev`, `libpng-dev`, `pkg-config`, `python3` |
-| macOS | `xcode-select --install` |
-| Windows | Visual Studio Build Tools (C++ workload), Python 3 |
+1. Check the postinstall log: `npm install @nut-tree-fork/nut-js --foreground-scripts` prints the libnut dlopen attempt.
+2. Verify the right prebuild is on disk:
+   - Linux:   `ls node_modules/@nut-tree-fork/libnut-linux/build/Release/libnut.node`
+   - macOS:   `ls node_modules/@nut-tree-fork/libnut-darwin/build/Release/libnut.node`
+   - Windows: `ls node_modules/@nut-tree-fork/libnut-win32/build/Release/libnut.node`
+3. If the binary is missing, your platform/arch isn't covered — open an issue with `node -p "process.platform + ' ' + process.arch"`.
+4. As a last resort:
 
-Then:
-
-```bash
-npm rebuild robotjs
-# or, nuclear option:
-rm -rf node_modules package-lock.json && npm install
-```
+    ```bash
+    rm -rf node_modules package-lock.json && npm install
+    ```
 
 ### `DISPLAY_NOT_FOUND` / "DISPLAY not set"
 
@@ -553,7 +540,7 @@ The CLI tool isn't installed or isn't on `$PATH`.
 | `xdotool` | `which xdotool` (Linux X11) |
 | `ydotool` | `which ydotool` and `systemctl status ydotoold` (Wayland) |
 | `wtype` | `which wtype` (Wayland keyboard fallback) |
-| `robotjs` | `node -e "require('robotjs')"` |
+| `nut.js` (macOS / Windows) | `node -e "require('@nut-tree-fork/nut-js')"` — should print without throwing |
 
 ### `OCR_FAILED`
 
@@ -646,7 +633,7 @@ brew uninstall tesseract
 choco uninstall tesseract
 ```
 
-You typically **shouldn't** remove `build-essential`, `libxtst-dev`, `libpng-dev`, etc. — they're useful for other native Node modules.
+You typically **shouldn't** remove `build-essential` — it's useful for any other native Node modules you might install later. The robotjs-specific build deps (`libxtst-dev`, `libpng-dev`) are no longer required since da-mcp migrated to `@nut-tree-fork/nut-js`, which ships prebuilt binaries.
 
 ---
 

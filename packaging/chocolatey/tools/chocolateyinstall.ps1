@@ -44,7 +44,7 @@ if ($inner) {
 }
 
 # ─── npm install + build ─────────────────────────────────────────────────────
-Write-Host "Installing npm dependencies (compiles robotjs, ~1-2 min)..." -ForegroundColor Cyan
+Write-Host "Installing npm dependencies (prebuilt libnut + NAPI binaries, ~10-30s)..." -ForegroundColor Cyan
 Set-Location $installDir
 npm install --no-audit --no-fund 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "npm install failed (exit $LASTEXITCODE)" }

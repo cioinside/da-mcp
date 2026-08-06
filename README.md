@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desktop, etc.) interact with a local desktop environment: screenshots, OCR with UI-element classification, mouse/keyboard control, and program launch — on Linux, macOS, and Windows.
 
-> **For AI agents and automated installers:** Do NOT chain `apt install … && npm install && npm run build` by hand. Use the bundled installer scripts — they handle the platform-specific prerequisites (tesseract, xdotool, Xcode CLT, VS Build Tools, Node 22+) and surface robotjs / NAPI / TCC failures as actionable errors instead of silent broken builds. See [Install (automated / AI agents)](#install-automated--ai-agents) below.
+> **For AI agents and automated installers:** Do NOT chain `apt install … && npm install && npm run build` by hand. Use the bundled installer scripts — they handle the platform-specific prerequisites (tesseract, xdotool, Node 22+) and surface native-binding / TCC failures as actionable errors instead of silent broken builds. See [Install (automated / AI agents)](#install-automated--ai-agents) below.
 
 ## Features
 
@@ -14,7 +14,7 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 - **`da_list_displays`** — List connected displays with id, bounds, scale factor.
 
 ### Input
-- **`da_get_mouse_position`** — Read current cursor position (X11/Linux uses `xdotool getmouselocation --shell`, Wayland uses `ydotool`, macOS/Windows uses `robotjs`).
+- **`da_get_mouse_position`** — Read current cursor position (X11/Linux uses `xdotool getmouselocation --shell`, Wayland uses `ydotool`, macOS/Windows uses `@nut-tree-fork/nut-js`).
 - **`da_move_mouse`** — Move the cursor to (x, y).
 - **`da_click`** — Click at (x, y) with optional button (left/right/middle/back/forward) and count.
 - **`da_double_click`** — Convenience wrapper for double-click.
@@ -48,7 +48,7 @@ The `da_ocr` classifier tags each detected text region with one of:
 - **Module layout** (250 LOC ceiling per file):
   - **Screenshot** — `src/screenshot/{png,backends,index,types}.ts`. PNG validation/encoding isolated in `png.ts`; backend dispatch (node-screenshots → screenshot-desktop → Windows CLI) in `backends.ts`.
   - **OCR** — `src/ocr/{cli,index,mock,parse,wasm,types,classify,classify-rules}.ts`. CLI backend (`runCli`), WASM fallback (`runWasm`), parser, mock; orchestrator in `index.ts` rethrows as `OCR_FAILED` when both backends fail.
-  - **Input** — `src/input/{routing,mouse,keyboard,scroll,drag,types,index}.ts`. Shared routing helpers (`runCli`, `resolveRouting`, `requireTool`, `loadRobotjs`, `isMockMode`, `validateCoords`, `Routing`) in `routing.ts`; per-input-type operations in dedicated files.
+  - **Input** — `src/input/{routing,mouse,keyboard,scroll,drag,types,index}.ts`. Shared routing helpers (`runCli`, `resolveRouting`, `requireTool`, `isMockMode`, `validateCoords`, `Routing`) in `routing.ts`; per-input-type operations in dedicated files. macOS/Windows path uses `@nut-tree-fork/nut-js` (libnut), statically imported.
   - **Launch** — `src/launch/{launch,types}.ts`. `open(1)` + `child_process.spawn` (shell:false); `SIGNAL_EXIT_CODES` map for POSIX signal mapping.
   - **Platform** — `src/platform/{detect,types}.ts`. `detectPlatform()` returns `{ os, display, tools, home }`; `assertPlatformSupported()` throws `PLATFORM_INIT_FAILED` on unsupported combos.
   - **Server** — `src/server.ts`. Registers 12 tools, wraps handler results into `CallToolResult` with `structuredContent` (Buffers stripped to `number[]` for JSON-safety), installs SIGINT/SIGTERM shutdown.
@@ -64,14 +64,14 @@ The `da_ocr` classifier tags each detected text region with one of:
 | Screenshot (Windows) | `node-screenshots` (GDI) | PowerShell BitBlt (`windowsCliBackend`, ships in `backends.ts`) | — |
 | Input (Linux X11) | `xdotool` CLI | — | — |
 | Input (Linux Wayland) | `ydotool` CLI | `wtype` (keyboard only) | — |
-| Input (macOS / Windows) | `robotjs` (native) | — | — |
+| Input (macOS / Windows) | `@nut-tree-fork/nut-js` (libnut, ships prebuilt binaries) | — | — |
 | OCR (any OS) | `tesseract` CLI | `tesseract.js@7` WASM | — |
 
 Every `spawnSync`/`spawn` call uses `shell:false`. Permission-gated errors (e.g. macOS ScreenCaptureKit, Windows access denied) are detected via a tightened pattern (`screen…permission`, `screencapturekit`, `access is denied`) and re-thrown as `DaMcpError('PERMISSION_DENIED')`.
 
 ## Install (automated / AI agents)
 
-If you are an AI agent setting this up on behalf of a user, or running scripted/CI installation, **use the bundled installer scripts**. Do not improvise a manual `npm install` chain — manual install bypasses the prompts that catch robotjs native-build failures, missing system tools, and PATH issues, and turns platform-specific gotchas into silent broken builds.
+If you are an AI agent setting this up on behalf of a user, or running scripted/CI installation, **use the bundled installer scripts**. Do not improvise a manual `npm install` chain — manual install bypasses the prompts that catch missing system tools and PATH issues, and turns platform-specific gotchas into silent broken builds.
 
 | OS | Command |
 |---|---|
@@ -81,7 +81,7 @@ If you are an AI agent setting this up on behalf of a user, or running scripted/
 
 What each script does:
 
-- **Verifies / installs system prerequisites** — tesseract, xdotool/ydotool (Linux), Xcode CLT (macOS), VS Build Tools (Windows), Node.js 22+
+- **Verifies / installs system prerequisites** — tesseract, xdotool/ydotool (Linux), Node.js 22+ (Xcode CLT only needed if Homebrew is missing it — handled via `brew install` if so)
 - **Runs `npm ci`** — locked, reproducible install. Avoid `npm install` (which resolves ranges and is slower)
 - **Builds TypeScript** with `npm run build`
 - **Runs `DA_MCP_TEST_MODE=mock npm test`** so the build is verified before you declare success
@@ -183,10 +183,10 @@ Open the host firewall for inbound TCP on `DA_MCP_PORT` (default 3000) once per 
 
 | OS | Screenshot | Input | Notes |
 |---|---|---|---|
-| Linux X11 | `node-screenshots` (X11 native) | `xdotool` | Requires `libxtst-dev libpng-dev` for robotjs build |
+| Linux X11 | `node-screenshots` (X11 native) | `xdotool` | x11-server-utils + XCap deps (handled by `install-system-deps.sh`) |
 | Linux Wayland | `node-screenshots` (XCap portal) | `ydotool` (daemon) | XWayland fallback if available |
-| macOS | `node-screenshots` (CG) | `robotjs` (CGEvent) | First call needs Screen Recording permission (TCC) |
-| Windows | `node-screenshots` (GDI) | `robotjs` (SendInput) | VS Build Tools required; PowerShell BitBlt fallback if GDI fails |
+| macOS | `node-screenshots` (CG) | `@nut-tree-fork/nut-js` (CGEvent) | First call needs Screen Recording permission (TCC) |
+| Windows | `node-screenshots` (GDI) | `@nut-tree-fork/nut-js` (SendInput) | PowerShell BitBlt fallback if GDI fails |
 
 ## Development
 
