@@ -1,0 +1,98 @@
+name: Release
+
+# Feature-flagged single-binary release pipeline (issues #16, #17).
+#
+# Default tag push (v*) ships Windows only — the v1.0.0 contract:
+#   curl -L https://github.com/cioinside/da-mcp/releases/latest/download/da-mcp-win32-x64.exe -o da-mcp.exe
+#   da-mcp.exe
+#
+# To release additional targets, pass the comma-separated `enabled_targets`
+# input via workflow_dispatch, e.g. `win32-x64,linux-x64`. Each matrix entry
+# is gated by `contains(env.ENABLED_TARGETS, matrix.target)` so jobs only run
+# when explicitly requested.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      enabled_targets:
+        description: 'Comma-separated list of build targets (default: win32-x64)'
+        default: 'win32-x64'
+        required: false
+
+env:
+  ENABLED_TARGETS: ${{ github.event.inputs.enabled_targets || 'win32-x64' }}
+
+jobs:
+  test:
+    name: Test (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - run: DA_MCP_TEST_MODE=mock npm test
+
+  build:
+    name: Build ${{ matrix.target }} (${{ matrix.os }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win32-x64
+            os: windows-latest
+          - target: linux-x64
+            os: ubuntu-22.04
+          - target: linux-arm64
+            os: ubuntu-22.04-arm
+          - target: darwin-x64
+            os: macos-14
+          - target: darwin-arm64
+            os: macos-14
+    runs-on: ${{ matrix.os }}
+    if: contains(env.ENABLED_TARGETS, matrix.target)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: SEA build for ${{ matrix.target }}
+        run: bash scripts/build-sea.sh ${{ matrix.target }}
+      - name: Upload ${{ matrix.target }} binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: da-mcp-${{ matrix.target }}
+          path: dist-sea/${{ matrix.target }}/da-mcp-${{ matrix.target }}*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Attach binaries to GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-release
+          merge-multiple: true
+      - name: List downloaded artifacts
+        run: ls -la dist-release/
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-release/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
