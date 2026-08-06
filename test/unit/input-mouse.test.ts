@@ -6,17 +6,17 @@
  * file drives getMousePosition() under DA_MCP_TEST_MODE=real with three layers
  * of mocking:
  *   - ../../src/platform/detect.js   → forced to a per-test PlatformInfo
- *   - robotjs                         → getMousePos stub
+ *   - @nut-tree-fork/nut-js           → mouse.getPosition stub
  *   - node:child_process              → spawnSync stub returning canned stdout
  *
  * Coverage:
  *   1. Linux X11: parses X=NNN / Y=NNN out of `xdotool getmouselocation --shell`.
- *   2. macOS:     returns robotjs.getMousePos() directly.
+ *   2. macOS:     returns mouse.getPosition() directly.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import * as cp from 'node:child_process'
-import * as robotjs from 'robotjs'
+import { mouse } from '@nut-tree-fork/nut-js'
 
 import { initConfig, resetConfig } from '../../src/config.js'
 import { detectPlatform } from '../../src/platform/detect.js'
@@ -27,16 +27,20 @@ vi.mock('../../src/platform/detect.js', () => ({
   detectPlatform: vi.fn(),
 }))
 
-vi.mock('robotjs', () => {
-  const fake = {
-    moveMouse: vi.fn(),
-    getMousePos: vi.fn(),
-    mouseClick: vi.fn(),
-    mouseToggle: vi.fn(),
-    scrollMouse: vi.fn(),
-  }
-  return { ...fake, default: fake }
-})
+vi.mock('@nut-tree-fork/nut-js', () => ({
+  mouse: {
+    setPosition: vi.fn(),
+    getPosition: vi.fn(),
+    click: vi.fn(),
+    doubleClick: vi.fn(),
+    pressButton: vi.fn(),
+    releaseButton: vi.fn(),
+    scrollDown: vi.fn(),
+    scrollUp: vi.fn(),
+    scrollLeft: vi.fn(),
+    scrollRight: vi.fn(),
+  },
+}))
 
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
@@ -58,7 +62,7 @@ function platformX11(): PlatformInfo {
       ydotool: false,
       wtype: false,
       screenshotDesktop: false,
-      robotjs: false,
+      nutjs: false,
       tesseract: false,
       scrot: false,
       grim: false,
@@ -78,7 +82,7 @@ function platformMac(): PlatformInfo {
       ydotool: false,
       wtype: false,
       screenshotDesktop: false,
-      robotjs: true,
+      nutjs: true,
       tesseract: false,
       scrot: false,
       grim: false,
@@ -94,7 +98,7 @@ beforeEach(() => {
   initConfig({ DA_MCP_TEST_MODE: 'real' })
   vi.mocked(cp.spawnSync).mockReset()
   vi.mocked(detectPlatform).mockReset()
-  vi.mocked(robotjs.getMousePos).mockReset()
+  vi.mocked(mouse.getPosition).mockReset()
 })
 
 afterEach(() => {
@@ -107,7 +111,6 @@ afterEach(() => {
 })
 
 describe('getMousePosition', () => {
-  // Test 1: Linux X11 path — spawnSync is mocked to return xdotool's --shell output.
   it('parses X/Y from xdotool getmouselocation --shell on Linux X11', async () => {
     vi.mocked(detectPlatform).mockReturnValue(platformX11())
     const stdout = Buffer.from('X=100\nY=200\nSCREEN=0\nWINDOW=12345\n')
@@ -128,12 +131,11 @@ describe('getMousePosition', () => {
     )
   })
 
-  // Test 2: macOS path — robotjs.getMousePos() returns integer coords directly.
-  it('returns robotjs coords on macOS', async () => {
+  it('returns nut.js mouse coords on macOS', async () => {
     vi.mocked(detectPlatform).mockReturnValue(platformMac())
-    vi.mocked(robotjs.getMousePos).mockReturnValue({ x: 50, y: 60 })
+    vi.mocked(mouse.getPosition).mockResolvedValue({ x: 50, y: 60 })
     const pos = await getMousePosition()
     expect(pos).toEqual({ x: 50, y: 60 })
-    expect(robotjs.getMousePos).toHaveBeenCalledTimes(1)
+    expect(mouse.getPosition).toHaveBeenCalledTimes(1)
   })
 })

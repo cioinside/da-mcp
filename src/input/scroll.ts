@@ -6,19 +6,26 @@
  * Routing per OS+display server:
  *   Linux + X11     → xdotool click 4 (up) / 5 (down), 6 (left) / 7 (right)
  *   Linux + Wayland → ydotool click 4 / 5 / 6 / 7
- *   macOS / Windows → robotjs.scrollMouse(dx, dy)
+ *   macOS / Windows → @nut-tree-fork/nut-js scrollUp/Down/Left/Right (per-axis)
  *   unknown         → throw DaMcpError('NATIVE_MISSING')
  *
  * stepPx controls granularity: each scroll "unit" issues one click event.
  * Defaults to 1 (one click per unit of dy/dx).
+ *
+ * Diagonal scrolling: robotjs supported diagonal scroll in a single
+ * `scrollMouse(dx, dy)` call. nut.js's libnut exposes per-axis methods
+ * only (`scrollUp / scrollDown / scrollLeft / scrollRight`), so we
+ * emulate diagonal by issuing the vertical axis first then the horizontal
+ * axis — matching the Linux + xdotool/ydotool branch order above so the
+ * perceived direction is identical across platforms.
  */
 
+import { mouse } from '@nut-tree-fork/nut-js'
 import { DaMcpError } from '../errors.js'
 import { detectPlatform } from '../platform/detect.js'
 import type { ScrollOptions } from './types.js'
 import {
   isMockMode,
-  loadRobotjs,
   requireTool,
   resolveRouting,
   runCli,
@@ -79,7 +86,13 @@ export async function mouseScroll(dx: number, dy: number, opts?: ScrollOptions):
     else if (dx < 0) emitLinuxClicks(tool, SCROLL_LEFT, Math.abs(Math.trunc(dx / stepPx)))
     return
   }
-  // macOS / Windows — robotjs.scrollMouse(x, y) where +y = down, +x = right.
-  const robotjs = await loadRobotjs()
-  robotjs.scrollMouse(Math.trunc(dx / stepPx), Math.trunc(dy / stepPx))
+  // macOS / Windows — @nut-tree-fork/nut-js (per-axis). Diagonal = vertical
+  // first then horizontal, matching the Linux branch above so the caller's
+  // perceived direction is identical across platforms.
+  const sx = Math.abs(Math.trunc(dx / stepPx))
+  const sy = Math.abs(Math.trunc(dy / stepPx))
+  if (dy > 0) await mouse.scrollDown(sy)
+  else if (dy < 0) await mouse.scrollUp(sy)
+  if (dx > 0) await mouse.scrollRight(sx)
+  else if (dx < 0) await mouse.scrollLeft(sx)
 }

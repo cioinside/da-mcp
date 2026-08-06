@@ -4,7 +4,7 @@
  * Routing is delegated to getMousePosition() in src/input/mouse.ts:
  *   Linux + X11     → xdotool getmouselocation --shell
  *   Linux + Wayland → ydotool getmouselocation
- *   macOS / Windows → robotjs.getMousePos()
+ *   macOS / Windows → @nut-tree-fork/nut-js mouse.getPosition()
  * In DA_MCP_TEST_MODE=mock the helper short-circuits to { x: 0, y: 0 } so
  * the tool remains safely callable from unit tests.
  */

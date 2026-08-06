@@ -31,7 +31,7 @@ describe('platform/types', () => {
       ydotool: boolean
       wtype: boolean
       screenshotDesktop: boolean
-      robotjs: boolean
+      nutjs: boolean
       tesseract: boolean
       scrot: boolean
       grim: boolean

@@ -17,7 +17,7 @@ export interface AvailableTools {
   ydotool: boolean          // Linux/Wayland keyboard/mouse CLI (requires daemon)
   wtype: boolean            // Linux/Wayland typing CLI
   screenshotDesktop: boolean // node-screenshots napi binary
-  robotjs: boolean          // native input library
+  nutjs: boolean             // @nut-tree-fork/nut-js native input library (macOS/Windows)
   tesseract: boolean        // OCR CLI
   scrot: boolean            // X11 screenshot CLI (fallback)
   grim: boolean             // Wayland screenshot CLI

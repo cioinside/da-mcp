@@ -10,7 +10,7 @@
  *
  * Runs via `tsx` against the source (not dist) so the test never goes
  * stale relative to src/server-dispatch.ts. Uses DA_MCP_TEST_MODE=mock
- * to avoid real native I/O (robotjs, screenshot-desktop, etc.).
+ * to avoid real native I/O (@nut-tree-fork/nut-js, screenshot-desktop, etc.).
  */
 import { describe, it, expect, afterEach } from 'vitest'
 import { spawn, type ChildProcess } from 'node:child_process'

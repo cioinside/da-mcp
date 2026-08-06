@@ -5,7 +5,7 @@
  * uniform across OS+display combinations:
  *   Linux + X11     → xdotool CLI
  *   Linux + Wayland → ydotool / wtype CLI
- *   macOS / Windows → robotjs (native, lazy-loaded)
+ *   macOS / Windows → @nut-tree-fork/nut-js (native, statically imported)
  *   unknown         → throw DaMcpError('NATIVE_MISSING')
  *
  * Every spawnSync / spawn call uses shell:false. Bounds validation runs at
@@ -106,17 +106,5 @@ export function requireTool(
       'NATIVE_MISSING',
       `required tool '${name}' is not installed on this ${routing.os}+${routing.display} system`,
     )
-  }
-}
-
-/** Lazy-load the robotjs native module. Throws NATIVE_MISSING on MODULE_NOT_FOUND. */
-export async function loadRobotjs(): Promise<typeof import('robotjs')> {
-  try {
-    return await import('robotjs')
-  } catch (e) {
-    if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
-      throw new DaMcpError('NATIVE_MISSING', 'robotjs native module not installed', e)
-    }
-    throw e
   }
 }

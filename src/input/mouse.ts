@@ -2,13 +2,13 @@
  * Mouse operations: mouseMove / mouseClick / mouseDown / mouseUp / getMousePosition.
  *
  * Routing per OS+display server and the shared helpers (runCli, resolveRouting,
- * requireTool, loadRobotjs, isMockMode, validateCoords) live in ./routing.ts.
+ * requireTool, isMockMode, validateCoords) live in ./routing.ts.
  * This module focuses on mouse-specific behavior and the mouse shell-location
  * parsers (parseShellLocation, readShellLocation) used by getMousePosition.
  *
  *   Linux + X11     → xdotool CLI
  *   Linux + Wayland → ydotool CLI
- *   macOS / Windows → robotjs (native, lazy-loaded)
+ *   macOS / Windows → @nut-tree-fork/nut-js (libnut native, statically imported)
  *   unknown         → throw DaMcpError('NATIVE_MISSING')
  *
  * Every spawnSync call uses shell:false. Bounds validation always runs;
@@ -17,13 +17,13 @@
  */
 
 import { spawnSync } from 'node:child_process'
+import { mouse, Button, Point } from '@nut-tree-fork/nut-js'
 import { detectPlatform } from '../platform/detect.js'
 import { DaMcpError } from '../errors.js'
 import type { MouseButton } from '../platform/types.js'
 import type { MouseOptions } from './types.js'
 import {
   isMockMode,
-  loadRobotjs,
   requireTool,
   resolveRouting,
   runCli,
@@ -38,6 +38,27 @@ function mouseButtonCode(button: MouseButton): number {
     case 'right': return 3
     case 'back': return 8
     case 'forward': return 9
+  }
+}
+
+/**
+ * Map MCP MouseButton → nut.js Button enum. nut.js / libnut only exposes
+ * LEFT / RIGHT / MIDDLE on macOS and Windows; 'back' / 'forward' have no
+ * native equivalent and throw NATIVE_MISSING (they remain supported on
+ * Linux + xdotool routing).
+ */
+function toNutButton(button: MouseButton): Button {
+  switch (button) {
+    case 'left': return Button.LEFT
+    case 'middle': return Button.MIDDLE
+    case 'right': return Button.RIGHT
+    case 'back':
+    case 'forward':
+      throw new DaMcpError(
+        'NATIVE_MISSING',
+        `'${button}' mouse button is not supported on macOS / Windows via @nut-tree-fork/nut-js; ` +
+        'use da_drag or switch to Linux + xdotool routing',
+      )
   }
 }
 
@@ -59,9 +80,8 @@ export async function mouseMove(x: number, y: number, opts?: MouseOptions): Prom
     runCli('ydotool', ['mousemove', '--absolute', String(x), String(y)])
     return
   }
-  // macOS / Windows — robotjs
-  const robotjs = await loadRobotjs()
-  robotjs.moveMouse(x, y)
+  // macOS / Windows — @nut-tree-fork/nut-js
+  await mouse.setPosition(new Point(x, y))
   void opts
 }
 
@@ -84,9 +104,13 @@ export async function mouseClick(button: MouseButton, count: number = 1): Promis
     }
     return
   }
-  // macOS / Windows
-  const robotjs = await loadRobotjs()
-  robotjs.mouseClick(button, count >= 2)
+  // macOS / Windows — @nut-tree-fork/nut-js
+  const btn = toNutButton(button)
+  if (count >= 2) {
+    await mouse.doubleClick(btn)
+  } else {
+    await mouse.click(btn)
+  }
 }
 
 export async function mouseDown(button: MouseButton): Promise<void> {
@@ -100,8 +124,8 @@ export async function mouseDown(button: MouseButton): Promise<void> {
     runCli(tool, ['mousedown', String(code)])
     return
   }
-  const robotjs = await loadRobotjs()
-  robotjs.mouseToggle('down', button)
+  // macOS / Windows
+  await mouse.pressButton(toNutButton(button))
 }
 
 export async function mouseUp(button: MouseButton): Promise<void> {
@@ -115,8 +139,8 @@ export async function mouseUp(button: MouseButton): Promise<void> {
     runCli(tool, ['mouseup', String(code)])
     return
   }
-  const robotjs = await loadRobotjs()
-  robotjs.mouseToggle('up', button)
+  // macOS / Windows
+  await mouse.releaseButton(toNutButton(button))
 }
 
 /**
@@ -187,14 +211,13 @@ export async function getMousePosition(): Promise<{ x: number; y: number }> {
     requireTool(info.tools, 'ydotool', routing)
     return readShellLocation('ydotool', ['getmouselocation'])
   }
-  // macOS / Windows — robotjs.getMousePos()
-  const robotjs = await loadRobotjs()
+  // macOS / Windows — @nut-tree-fork/nut-js
   try {
-    const pos = robotjs.getMousePos()
+    const pos = await mouse.getPosition()
     if (!Number.isInteger(pos.x) || !Number.isInteger(pos.y)) {
       throw new DaMcpError(
         'NATIVE_FAILED',
-        `robotjs.getMousePos() returned non-integer coords: x=${String(pos.x)}, y=${String(pos.y)}`,
+        `mouse.getPosition() returned non-integer coords: x=${String(pos.x)}, y=${String(pos.y)}`,
       )
     }
     return { x: pos.x, y: pos.y }
@@ -202,7 +225,7 @@ export async function getMousePosition(): Promise<{ x: number; y: number }> {
     if (e instanceof DaMcpError) throw e
     throw new DaMcpError(
       'NATIVE_FAILED',
-      'robotjs.getMousePos() failed',
+      'mouse.getPosition() failed',
       e instanceof Error ? e : undefined,
     )
   }

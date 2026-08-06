@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { Key } from '@nut-tree-fork/nut-js'
 import { initConfig, getConfig, resetConfig } from '../../src/config.js'
 import { DaMcpError } from '../../src/errors.js'
 import {
@@ -13,7 +14,7 @@ import {
   mouseScroll,
   mouseDrag,
 } from '../../src/input/index.js'
-import { toRobotjsModifier, toRobotjsKey } from '../../src/input/keyboard.js'
+import { toNutModifier, toNutKey } from '../../src/input/keyboard.js'
 
 const TRACKED = ['DA_MCP_TEST_MODE', 'DA_MCP_MAX_TYPE_BYTES'] as const
 type TrackedKey = (typeof TRACKED)[number]
@@ -165,71 +166,115 @@ describe('mouseDrag', () => {
   })
 })
 
-// ---- toRobotjsModifier ------------------------------------------------------
-// Regression tests for the MCP-modifier → robotjs-flag translation.
-// robotjs throws "Invalid key flag specified" for the MCP-side names "ctrl" /
-// "meta" because it expects "control" / "command". See PR description.
+// ---- toNutModifier ------------------------------------------------------------
+// Regression tests for the MCP-modifier → nut.js Key enum translation.
+// Pick Left* variants so chord presses don't desync the modifier state.
 
-describe('toRobotjsModifier', () => {
-  it('translates "ctrl" → "control"', () => {
-    expect(toRobotjsModifier('ctrl')).toBe('control')
+describe('toNutModifier', () => {
+  it('translates "ctrl" → Key.LeftControl', () => {
+    expect(toNutModifier('ctrl')).toBe(Key.LeftControl)
   })
 
-  it('translates "meta" → "command"', () => {
-    expect(toRobotjsModifier('meta')).toBe('command')
+  it('translates "alt" → Key.LeftAlt', () => {
+    expect(toNutModifier('alt')).toBe(Key.LeftAlt)
   })
 
-  it('passes "shift" through unchanged', () => {
-    expect(toRobotjsModifier('shift')).toBe('shift')
+  it('translates "shift" → Key.LeftShift', () => {
+    expect(toNutModifier('shift')).toBe(Key.LeftShift)
   })
 
-  it('passes "alt" through unchanged', () => {
-    expect(toRobotjsModifier('alt')).toBe('alt')
+  it('translates "meta" → Key.LeftMeta', () => {
+    expect(toNutModifier('meta')).toBe(Key.LeftMeta)
   })
 
-  it('passes unknown names through unchanged (passthrough)', () => {
-    // Future MCP-modifier additions should not be silently dropped; the
-    // robotjs side will reject them with a clear error if unsupported.
-    expect(toRobotjsModifier('hyper')).toBe('hyper')
+  it('translates "super" → Key.LeftSuper', () => {
+    expect(toNutModifier('super')).toBe(Key.LeftSuper)
+  })
+
+  it('throws DaMcpError INVALID_ARGUMENT for unknown modifier names', () => {
+    expect(() => toNutModifier('hyper')).toThrow(DaMcpError)
+    try {
+      toNutModifier('hyper')
+    } catch (err) {
+      expect(DaMcpError.is(err)).toBe(true)
+      if (DaMcpError.is(err)) {
+        expect(err.code).toBe('INVALID_ARGUMENT')
+      }
+    }
   })
 })
 
-// ---- toRobotjsKey ------------------------------------------------------------
-// Regression tests for the MCP-key → robotjs-key translation.
-// robotjs throws "Invalid key code specified" for the MCP-side name "return"
-// because it expects "enter". Linux CLIs (xdotool / ydotool) are NOT remapped;
-// only the robotjs branch in keyboard.ts applies the alias. See PR description.
+// ---- toNutKey -----------------------------------------------------------------
 
-describe('toRobotjsKey', () => {
-  it('translates "return" → "enter"', () => {
-    expect(toRobotjsKey('return')).toBe('enter')
+describe('toNutKey', () => {
+  it('uppercases single-character keys (a → Key.A)', () => {
+    expect(toNutKey('a')).toBe(Key.A)
   })
 
-  it('passes "enter" through unchanged', () => {
-    expect(toRobotjsKey('enter')).toBe('enter')
+  it('uppercases single-character keys (z → Key.Z)', () => {
+    expect(toNutKey('z')).toBe(Key.Z)
   })
 
-  it('passes "Return" (capitalised MCP canonical) through unchanged', () => {
-    // Linux CLIs use "Return"; robotjs also accepts it. The alias is for the
-    // lowercase "return" alias only — case-sensitive mapping is intentional so
-    // canonical names from MCP clients stay untouched.
-    expect(toRobotjsKey('Return')).toBe('Return')
+  it('uppercases single-character keys (already-uppercase A stays Key.A)', () => {
+    expect(toNutKey('A')).toBe(Key.A)
   })
 
-  it('passes single-character keys through unchanged', () => {
-    expect(toRobotjsKey('a')).toBe('a')
-    expect(toRobotjsKey('A')).toBe('A')
-    expect(toRobotjsKey('1')).toBe('1')
+  it('prefixes single digits with "Num" (0 → Key.Num0)', () => {
+    expect(toNutKey('0')).toBe(Key.Num0)
   })
 
-  it('passes unknown multi-char keys through unchanged (passthrough)', () => {
-    // Future MCP-key additions should not be silently dropped; the robotjs
-    // side will reject them with a clear error if unsupported.
-    expect(toRobotjsKey('PageUp')).toBe('PageUp')
-    expect(toRobotjsKey('F5')).toBe('F5')
+  it('prefixes single digits with "Num" (9 → Key.Num9)', () => {
+    expect(toNutKey('9')).toBe(Key.Num9)
   })
 
-  it('passes empty string through unchanged', () => {
-    expect(toRobotjsKey('')).toBe('')
+  it('normalises "BackSpace" → "Backspace"', () => {
+    expect(toNutKey('BackSpace')).toBe(Key.Backspace)
+  })
+
+  it('normalises "Num_Lock" → "NumLock"', () => {
+    expect(toNutKey('Num_Lock')).toBe(Key.NumLock)
+  })
+
+  it('normalises "Page_Up" → "PageUp"', () => {
+    expect(toNutKey('Page_Up')).toBe(Key.PageUp)
+  })
+
+  it('normalises "Page_Down" → "PageDown"', () => {
+    expect(toNutKey('Page_Down')).toBe(Key.PageDown)
+  })
+
+  it('looks up "Return" in the Key enum', () => {
+    expect(toNutKey('Return')).toBe(Key.Return)
+  })
+
+  it('looks up "Enter" in the Key enum', () => {
+    expect(toNutKey('Enter')).toBe(Key.Enter)
+  })
+
+  it('looks up "F5" in the Key enum', () => {
+    expect(toNutKey('F5')).toBe(Key.F5)
+  })
+
+  it('looks up "Tab" in the Key enum', () => {
+    expect(toNutKey('Tab')).toBe(Key.Tab)
+  })
+
+  it('throws DaMcpError INVALID_ARGUMENT for unknown key names', () => {
+    expect(() => toNutKey('not_a_real_key')).toThrow(DaMcpError)
+    try {
+      toNutKey('not_a_real_key')
+    } catch (err) {
+      expect(DaMcpError.is(err)).toBe(true)
+      if (DaMcpError.is(err)) {
+        expect(err.code).toBe('INVALID_ARGUMENT')
+      }
+    }
+  })
+
+  it('throws DaMcpError INVALID_ARGUMENT for empty string', () => {
+    // Empty string is single-char (length === 1) but uppercases to itself;
+    // Key[''] is undefined so the lookup fails. Be explicit about the
+    // contract rather than treating it as a silent passthrough.
+    expect(() => toNutKey('')).toThrow(DaMcpError)
   })
 })
