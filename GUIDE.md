@@ -287,6 +287,29 @@ $bmp.Save("$env:TEMP\test.png")
 
 ---
 
+## Single-binary install (Windows, recommended)
+
+For Windows users, a self-contained single-binary release is available — no Node.js, no `npm install`, no build step. The binary embeds Node 22 + the bundled JavaScript via Node SEA (`scripts/build-sea.sh`); **the only system requirement is [`tesseract`](https://github.com/UB-Mannheim/tesseract) on `$PATH`** (for OCR).
+
+```powershell
+# Download latest release asset from GitHub
+curl.exe -L -o da-mcp.exe https://github.com/cioinside/da-mcp/releases/latest/download/da-mcp-win32-x64.exe
+
+# First run — prints CLI help
+.\da-mcp.exe help
+
+# Run stdio MCP server (default)
+.\da-mcp.exe
+```
+
+**Caveats:**
+
+- **Unsigned binary** — `postject` strips Authenticode when injecting the SEA blob, so Windows SmartScreen will warn on first launch. Click "More info" → "Run anyway".
+- **No native deps** — `screenshot-desktop`, MCP SDK, `zod` are all bundled in the binary.
+- **Linux + macOS binaries are not part of the v1.0.0 release** — see [`BUILD.md`](BUILD.md) for the local cross-platform build path.
+
+For source builds on Windows (or any other OS), see [Install on Windows](#install-on-windows) above.
+
 ## Configure your MCP client
 
 The server speaks MCP over stdio. Every client launches it the same way: spawn `node` with the absolute path to `dist/server-dispatch.js`. Replace `/absolute/path/to/da-mcp` with the real path.

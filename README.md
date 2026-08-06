@@ -122,6 +122,29 @@ If a script fails, **read its output** — the next step is printed at the end o
 
 For manual / sandboxed installs where you cannot run the scripts, see [Install](#install) below.
 
+## Install (Windows, single-binary)
+
+For Windows users, a self-contained single-binary release is available — no Node.js, no `npm install`, no build step. The binary embeds Node 22 + the bundled JavaScript via Node SEA (`scripts/build-sea.sh`); **the only system requirement is [`tesseract`](https://github.com/UB-Mannheim/tesseract) on `$PATH`** (for OCR).
+
+```powershell
+# Download latest release asset from GitHub
+curl.exe -L -o da-mcp.exe https://github.com/cioinside/da-mcp/releases/latest/download/da-mcp-win32-x64.exe
+
+# First run — prints CLI help and exits 0
+.\da-mcp.exe help
+
+# Run stdio MCP server (default — point your MCP client at this binary)
+.\da-mcp.exe
+```
+
+**Caveats:**
+
+- **Unsigned binary** — `postject` strips Authenticode when injecting the SEA blob, so Windows SmartScreen will warn on first launch. Click "More info" → "Run anyway".
+- **No native NAPI deps** — `screenshot-desktop`, MCP SDK, `zod` are all inlined in the binary. Only `tesseract` is external.
+- **Linux + macOS binaries are not part of the v1.0.0 release** — see [`BUILD.md`](BUILD.md) for the local cross-platform build path (Windows SEA build runs on `windows-latest` CI only).
+
+For source installs (Linux/macOS/Windows dev workflow), continue to [Install](#install) below.
+
 ## Install
 
 ```bash
