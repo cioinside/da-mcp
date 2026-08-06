@@ -57,7 +57,7 @@ jobs:
           - target: darwin-arm64
             os: macos-14
     runs-on: ${{ matrix.os }}
-    if: ${{ (github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, matrix.target)) || (github.event_name == 'push' && matrix.target == 'win32-x64') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || matrix.target == 'win32-x64' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
