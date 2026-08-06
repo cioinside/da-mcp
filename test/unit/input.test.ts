@@ -13,6 +13,7 @@ import {
   mouseScroll,
   mouseDrag,
 } from '../../src/input/index.js'
+import { toRobotjsModifier } from '../../src/input/keyboard.js'
 
 const TRACKED = ['DA_MCP_TEST_MODE', 'DA_MCP_MAX_TYPE_BYTES'] as const
 type TrackedKey = (typeof TRACKED)[number]
@@ -161,5 +162,34 @@ describe('mouseDrag', () => {
   it('mouseDrag throws OUT_OF_BOUNDS when target is out of range', async () => {
     const caught = await captureThrown(mouseDrag(0, 0, -1, 0))
     assertCode(caught, 'OUT_OF_BOUNDS')
+  })
+})
+
+// ---- toRobotjsModifier ------------------------------------------------------
+// Regression tests for the MCP-modifier → robotjs-flag translation.
+// robotjs throws "Invalid key flag specified" for the MCP-side names "ctrl" /
+// "meta" because it expects "control" / "command". See PR description.
+
+describe('toRobotjsModifier', () => {
+  it('translates "ctrl" → "control"', () => {
+    expect(toRobotjsModifier('ctrl')).toBe('control')
+  })
+
+  it('translates "meta" → "command"', () => {
+    expect(toRobotjsModifier('meta')).toBe('command')
+  })
+
+  it('passes "shift" through unchanged', () => {
+    expect(toRobotjsModifier('shift')).toBe('shift')
+  })
+
+  it('passes "alt" through unchanged', () => {
+    expect(toRobotjsModifier('alt')).toBe('alt')
+  })
+
+  it('passes unknown names through unchanged (passthrough)', () => {
+    // Future MCP-modifier additions should not be silently dropped; the
+    // robotjs side will reject them with a clear error if unsupported.
+    expect(toRobotjsModifier('hyper')).toBe('hyper')
   })
 })
