@@ -23,7 +23,7 @@ import { DaMcpError } from '../errors.js'
 export interface HttpServerOptions {
   /** TCP port to bind (use 0 to get a kernel-assigned port, useful in tests). */
   port: number
-  /** Host / interface to bind. Defaults to '127.0.0.1' (loopback only). */
+  /** Host / interface to bind. Defaults to '0.0.0.0' (LAN-reachable, token-gated). */
   host: string
   /** Bearer token required in the first path segment of every request. */
   token: string
@@ -54,7 +54,7 @@ export function isLoopbackHost(host: string): boolean {
 
 const LOOPBACK_HINT =
   'da-mcp: bound to loopback — remote clients on the LAN cannot reach this. ' +
-  'Set DA_MCP_HTTP_HOST=0.0.0.0 to listen on all interfaces, or run `npm run start:lan`.'
+  'Set DA_MCP_HTTP_HOST=0.0.0.0 (default) to listen on all interfaces.'
 
 function unauthorized(res: ServerResponse): void {
   res.statusCode = 401

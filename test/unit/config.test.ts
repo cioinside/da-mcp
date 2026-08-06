@@ -70,7 +70,7 @@ describe('loadConfig — defaults', () => {
     expect(cfg.subprocessTimeoutMs).toBe(30000)
     expect(cfg.transport).toBe('stdio')
     expect(cfg.httpPort).toBe(3000)
-    expect(cfg.httpHost).toBe('127.0.0.1')
+    expect(cfg.httpHost).toBe('0.0.0.0')
     expect(cfg.tokenPath).toBe('')
   })
 })

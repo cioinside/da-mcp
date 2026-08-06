@@ -137,7 +137,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   const httpHostRaw = env['DA_MCP_HTTP_HOST']
   const httpHost =
-    httpHostRaw !== undefined && httpHostRaw.length > 0 ? httpHostRaw : '127.0.0.1'
+    httpHostRaw !== undefined && httpHostRaw.length > 0 ? httpHostRaw : '0.0.0.0'
   if (!HOST_PATTERN.test(httpHost)) {
     throw new DaMcpError(
       'INVALID_ARGUMENT',

@@ -118,7 +118,7 @@ The server speaks MCP over stdio. Configure your MCP client to launch `node /pro
 
 ### HTTP (opt-in, token-protected)
 
-Set `DA_MCP_TRANSPORT=http` to expose the server on `http://127.0.0.1:3000/<token>`. A 256-bit random token is generated on first start and persisted at:
+Set `DA_MCP_TRANSPORT=http` to expose the server on `http://0.0.0.0:3000/<token>`. A 256-bit random token is generated on first start and persisted at:
 
 | OS | Token path |
 |---|---|
@@ -129,31 +129,38 @@ Set `DA_MCP_TRANSPORT=http` to expose the server on `http://127.0.0.1:3000/<toke
 The token file is created with mode `0o600` (owner-only). Rotate it any time:
 
 ```bash
-node /projects/da-mcp/dist/server.js token regenerate
-# → http://127.0.0.1:3000/<43-char-base64url-token>
+node /projects/da-mcp/dist/server-dispatch.js token regenerate
+# → http://0.0.0.0:3000/<43-char-base64url-token>
+# (substitute the host's LAN IP for 0.0.0.0 when configuring the remote client)
 ```
 
 Override defaults with env vars:
 
-- `DA_MCP_HTTP_HOST` — bind address (default `127.0.0.1`); supports IPv4, IPv6 (`[::1]`), and hostname
+- `DA_MCP_HTTP_HOST` — bind address (default `0.0.0.0` — LAN-reachable, token-gated); supports IPv4, IPv6 (`[::1]`), and hostname
 - `DA_MCP_PORT` — port (default `3000`)
 - `DA_MCP_TOKEN_PATH` — override token storage path
 
-The URL is **unauthenticated token** (bearer-style): anyone with the token can call tools. Bind only to `127.0.0.1` (default) — do not expose this to a network without adding an upstream auth proxy.
+The URL is a **bearer-style token** — anyone with the token can call tools (mouse, keyboard, screenshot, launch). Default `0.0.0.0` bind means the daemon is reachable from any host that can route to this machine (LAN, VPN, public IP). The token is the sole auth — its 256-bit entropy is unguessable, but treat it as a password: protect the token file, and rotate it (`token regenerate`) if it may have leaked. To restrict the bind to the loopback interface only, set `DA_MCP_HTTP_HOST=127.0.0.1` — the server prints a one-line confirmation at startup.
 
 #### Remote access from another host on the LAN
 
-When `DA_MCP_TRANSPORT=http` is set but `DA_MCP_HTTP_HOST` is left at its default `127.0.0.1`, the server prints a one-line warning at startup. To reach the daemon from another machine:
+Because the default `DA_MCP_HTTP_HOST=0.0.0.0` already listens on all interfaces, no special launcher is needed:
 
 ```bash
-npm run start:lan
-# → sets DA_MCP_TRANSPORT=http + DA_MCP_HTTP_HOST=0.0.0.0, then spawns the server
-# → prints the platform firewall command you need to run, and the token file path
+DA_MCP_TRANSPORT=http npm start
+# → server boots, binds 0.0.0.0:3000, prints URL with token to stderr
 ```
 
-Then on the **remote** machine, configure your MCP client with the full URL `http://<lan-ip>:3000/<token>` from the server's startup log. The token is read from the local file (see table above) — copy it via `node /projects/da-mcp/dist/server-dispatch.js token regenerate`.
+On the **remote** machine, configure your MCP client with `http://<lan-ip>:3000/<token>` — replace `0.0.0.0` with the host's actual LAN IP (`hostname -I`, `ipconfig getifaddr en0`, `ipconfig`).
 
-The script does NOT auto-open the host firewall: that requires elevation and varies per OS. Run the printed command (e.g. `New-NetFirewallRule -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow` on Windows) once before the first remote connection.
+Open the host firewall for inbound TCP on `DA_MCP_PORT` (default 3000) once per OS — this requires elevation and varies per platform:
+
+| OS | Command |
+|---|---|
+| Linux (firewalld) | `sudo firewall-cmd --add-port=3000/tcp --permanent && sudo firewall-cmd --reload` |
+| Linux (ufw) | `sudo ufw allow 3000/tcp` |
+| macOS | System Settings → Network → Firewall → allow incoming for the `node` binary (or turn off the application firewall) |
+| Windows (PowerShell, admin) | `New-NetFirewallRule -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow -DisplayName "da-mcp"` |
 
 ### OpenCode / Claude Desktop example config
 
@@ -200,7 +207,7 @@ npx vitest
 ### Test inventory
 
 - **18 test files**: 15 unit (`test/unit/`) + 3 e2e (`test/e2e/`)
-- **261 tests passing / 18 skipped** in mock mode (e2e require real X11/tesseract)
+- **286 tests passing / 18 skipped** in mock mode (e2e require real X11/tesseract)
 - **Test runtime**: `process.env['DA_MCP_TEST_MODE'] === 'mock'` short-circuits native calls; `_mock.ts` modules inject deterministic native modules
 
 ### Conventions
@@ -223,7 +230,7 @@ npx vitest
 - `DA_MCP_SCREENSHOT_BACKEND` — force a screenshot backend (`node-screenshots` | `screenshot-desktop` | `windows-cli`); default auto-detect
 - `DA_MCP_TRANSPORT` — `stdio` (default) or `http`; `http` enables the opt-in HTTP transport
 - `DA_MCP_PORT` — HTTP port when `DA_MCP_TRANSPORT=http` (default `3000`)
-- `DA_MCP_HTTP_HOST` — HTTP bind address (default `127.0.0.1`); supports IPv4, IPv6, hostname
+- `DA_MCP_HTTP_HOST` — HTTP bind address (default `0.0.0.0` — LAN-reachable, token-gated); supports IPv4, IPv6, hostname
 - `DA_MCP_TOKEN_PATH` — override the auth token storage path
 
 ## License
