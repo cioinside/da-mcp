@@ -19,7 +19,10 @@
     "test:unit": "vitest run test/unit",
     "test:integration": "vitest run test/integration",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "upgrade": "tsx src/server-dispatch.ts upgrade",
+    "install-service": "tsx src/server-dispatch.ts install-service",
+    "uninstall-service": "tsx src/server-dispatch.ts uninstall-service"
   },
   "dependencies": {
     "@modelcontextprotocol/core": "2.0.0",

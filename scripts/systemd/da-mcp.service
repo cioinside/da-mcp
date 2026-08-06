@@ -1,0 +1,20 @@
+[Unit]
+Description=da-mcp cross-platform desktop automation MCP server
+Documentation=https://github.com/cioinside/da-mcp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=DA_MCP_TRANSPORT={{transport}}
+Environment=NODE_ENV=production
+ExecStart={{nodePath}} {{projectRoot}}/dist/server-dispatch.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+KillMode=mixed
+StandardOutput=append:{{logPath}}
+StandardError=append:{{logPath}}
+
+[Install]
+WantedBy=default.target
