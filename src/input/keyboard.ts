@@ -56,6 +56,19 @@ function robotjsModifierArgs(modifiers: readonly Modifier[]): readonly string[] 
   return modifiers.map(toRobotjsModifier)
 }
 
+/** Map MCP key names to robotjs's expected names. robotjs rejects 'return'
+ * (raises "Invalid key code specified" on older versions) — it expects 'enter'.
+ * Linux CLIs (xdotool/ydotool) accept canonical names and are NOT remapped.
+ * Exported for unit tests; not part of the public input API.
+ */
+const ROBOTJS_KEY_ALIASES: Readonly<Record<string, string>> = {
+  return: 'enter',
+}
+
+export function toRobotjsKey(name: string): string {
+  return ROBOTJS_KEY_ALIASES[name] ?? name
+}
+
 export async function keyTap(
   key: KeyName,
   modifiers?: readonly Modifier[],
@@ -90,12 +103,13 @@ export async function keyTap(
   // macOS / Windows
   const robotjs = await loadRobotjs()
   const modArg = robotjsModifierArgs(mods)
+  const rkey = toRobotjsKey(key)
   if (modArg === undefined) {
-    robotjs.keyTap(key)
+    robotjs.keyTap(rkey)
   } else {
     // robotjs.keyTap takes each modifier as a separate positional arg
     // (not an array — passing an array raises "Invalid key flag specified").
-    robotjs.keyTap(key, ...modArg)
+    robotjs.keyTap(rkey, ...modArg)
   }
 }
 
@@ -114,7 +128,7 @@ export async function keyDown(key: KeyName): Promise<void> {
     return
   }
   const robotjs = await loadRobotjs()
-  robotjs.keyToggle(key, 'down')
+  robotjs.keyToggle(toRobotjsKey(key), 'down')
 }
 
 export async function keyUp(key: KeyName): Promise<void> {
@@ -132,7 +146,7 @@ export async function keyUp(key: KeyName): Promise<void> {
     return
   }
   const robotjs = await loadRobotjs()
-  robotjs.keyToggle(key, 'up')
+  robotjs.keyToggle(toRobotjsKey(key), 'up')
 }
 
 export async function typeText(text: string, opts?: TypeOptions): Promise<void> {

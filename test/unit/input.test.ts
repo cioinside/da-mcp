@@ -13,7 +13,7 @@ import {
   mouseScroll,
   mouseDrag,
 } from '../../src/input/index.js'
-import { toRobotjsModifier } from '../../src/input/keyboard.js'
+import { toRobotjsModifier, toRobotjsKey } from '../../src/input/keyboard.js'
 
 const TRACKED = ['DA_MCP_TEST_MODE', 'DA_MCP_MAX_TYPE_BYTES'] as const
 type TrackedKey = (typeof TRACKED)[number]
@@ -191,5 +191,45 @@ describe('toRobotjsModifier', () => {
     // Future MCP-modifier additions should not be silently dropped; the
     // robotjs side will reject them with a clear error if unsupported.
     expect(toRobotjsModifier('hyper')).toBe('hyper')
+  })
+})
+
+// ---- toRobotjsKey ------------------------------------------------------------
+// Regression tests for the MCP-key → robotjs-key translation.
+// robotjs throws "Invalid key code specified" for the MCP-side name "return"
+// because it expects "enter". Linux CLIs (xdotool / ydotool) are NOT remapped;
+// only the robotjs branch in keyboard.ts applies the alias. See PR description.
+
+describe('toRobotjsKey', () => {
+  it('translates "return" → "enter"', () => {
+    expect(toRobotjsKey('return')).toBe('enter')
+  })
+
+  it('passes "enter" through unchanged', () => {
+    expect(toRobotjsKey('enter')).toBe('enter')
+  })
+
+  it('passes "Return" (capitalised MCP canonical) through unchanged', () => {
+    // Linux CLIs use "Return"; robotjs also accepts it. The alias is for the
+    // lowercase "return" alias only — case-sensitive mapping is intentional so
+    // canonical names from MCP clients stay untouched.
+    expect(toRobotjsKey('Return')).toBe('Return')
+  })
+
+  it('passes single-character keys through unchanged', () => {
+    expect(toRobotjsKey('a')).toBe('a')
+    expect(toRobotjsKey('A')).toBe('A')
+    expect(toRobotjsKey('1')).toBe('1')
+  })
+
+  it('passes unknown multi-char keys through unchanged (passthrough)', () => {
+    // Future MCP-key additions should not be silently dropped; the robotjs
+    // side will reject them with a clear error if unsupported.
+    expect(toRobotjsKey('PageUp')).toBe('PageUp')
+    expect(toRobotjsKey('F5')).toBe('F5')
+  })
+
+  it('passes empty string through unchanged', () => {
+    expect(toRobotjsKey('')).toBe('')
   })
 })
