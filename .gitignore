@@ -14,7 +14,8 @@ tessdata/
 
 # Tooling / runtime artifacts (not project source)
 .omo/
-.opencode/
+.opencode/node_modules/
+.opencode/memory/
 .codegraph/
 .codegraph
 .local/
