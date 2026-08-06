@@ -109,10 +109,21 @@ export function requireTool(
   }
 }
 
-/** Lazy-load the robotjs native module. Throws NATIVE_MISSING on MODULE_NOT_FOUND. */
+/** Lazy-load the robotjs native module. Throws NATIVE_MISSING on MODULE_NOT_FOUND.
+ *
+ * Note: `await import('robotjs')` returns the ESM module namespace. For CJS
+ * modules, Node only synthesises a small subset of named exports (the
+ * CJS-module-lexer matches the file-shape of robotjs's index.js), so
+ * `robotjs.typeString`, `robotjs.keyTap`, etc. are exposed on `.default`
+ * (which IS the original `module.exports`) rather than as named exports.
+ *
+ * Without this fallback, every native call (`.typeString(...)`, `.keyTap(...)`,
+ * `.mouseClick(...)`, ...) raises "X is not a function" at runtime.
+ */
 export async function loadRobotjs(): Promise<typeof import('robotjs')> {
   try {
-    return await import('robotjs')
+    const mod = await import('robotjs')
+    return (mod.default ?? mod) as typeof import('robotjs')
   } catch (e) {
     if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
       throw new DaMcpError('NATIVE_MISSING', 'robotjs native module not installed', e)
