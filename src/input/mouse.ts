@@ -1,23 +1,19 @@
 /**
- * Mouse operations: mouseMove / mouseClick / mouseDown / mouseUp / getMousePosition.
+ * Mouse operations — public dispatch entry point.
  *
- * Routing per OS+display server and the shared helpers (runCli, resolveRouting,
- * requireTool, isMockMode, validateCoords) live in ./routing.ts.
- * This module focuses on mouse-specific behavior and the mouse shell-location
- * parsers (parseShellLocation, readShellLocation) used by getMousePosition.
+ * Per-OS backends live in `./mouse-{macos,windows}.ts`. Linux paths stay
+ * inline (xdotool / ydotool) since they were already shell-out.
  *
  *   Linux + X11     → xdotool CLI
  *   Linux + Wayland → ydotool CLI
- *   macOS / Windows → @nut-tree-fork/nut-js (libnut native, statically imported)
- *   unknown         → throw DaMcpError('NATIVE_MISSING')
+ *   Windows         → PowerShell + user32 (mouse-windows.ts)
+ *   macOS           → osascript (mouse-macos.ts; v1.0.0 stub, deferred to #19)
  *
- * Every spawnSync call uses shell:false. Bounds validation always runs;
- * in DA_MCP_TEST_MODE=mock the native call is skipped and the function
- * resolves immediately after validation.
+ * All spawn / spawnSync calls use shell:false. Bounds validation runs at
+ * every public entry point; in DA_MCP_TEST_MODE=mock the native call is
+ * skipped via isMockMode().
  */
-
 import { spawnSync } from 'node:child_process'
-import { mouse, Button, Point } from '@nut-tree-fork/nut-js'
 import { detectPlatform } from '../platform/detect.js'
 import { DaMcpError } from '../errors.js'
 import type { MouseButton } from '../platform/types.js'
@@ -29,6 +25,8 @@ import {
   runCli,
   validateCoords,
 } from './routing.js'
+import { mouseMoveMac, mouseClickMac, mouseDownMac, mouseUpMac, getMousePositionMac } from './mouse-macos.js'
+import { mouseMoveWindows, mouseClickWindows, mouseDownWindows, mouseUpWindows, getMousePositionWindows } from './mouse-windows.js'
 
 /** X11 / ydotool button codes (1=left, 2=middle, 3=right, 8=back, 9=forward). */
 function mouseButtonCode(button: MouseButton): number {
@@ -38,27 +36,6 @@ function mouseButtonCode(button: MouseButton): number {
     case 'right': return 3
     case 'back': return 8
     case 'forward': return 9
-  }
-}
-
-/**
- * Map MCP MouseButton → nut.js Button enum. nut.js / libnut only exposes
- * LEFT / RIGHT / MIDDLE on macOS and Windows; 'back' / 'forward' have no
- * native equivalent and throw NATIVE_MISSING (they remain supported on
- * Linux + xdotool routing).
- */
-function toNutButton(button: MouseButton): Button {
-  switch (button) {
-    case 'left': return Button.LEFT
-    case 'middle': return Button.MIDDLE
-    case 'right': return Button.RIGHT
-    case 'back':
-    case 'forward':
-      throw new DaMcpError(
-        'NATIVE_MISSING',
-        `'${button}' mouse button is not supported on macOS / Windows via @nut-tree-fork/nut-js; ` +
-        'use da_drag or switch to Linux + xdotool routing',
-      )
   }
 }
 
@@ -80,9 +57,13 @@ export async function mouseMove(x: number, y: number, opts?: MouseOptions): Prom
     runCli('ydotool', ['mousemove', '--absolute', String(x), String(y)])
     return
   }
-  // macOS / Windows — @nut-tree-fork/nut-js
-  await mouse.setPosition(new Point(x, y))
-  void opts
+  if (routing.os === 'win32') {
+    await mouseMoveWindows(x, y)
+    return
+  }
+  // darwin
+  void info
+  await mouseMoveMac(x, y)
 }
 
 export async function mouseClick(button: MouseButton, count: number = 1): Promise<void> {
@@ -104,13 +85,14 @@ export async function mouseClick(button: MouseButton, count: number = 1): Promis
     }
     return
   }
-  // macOS / Windows — @nut-tree-fork/nut-js
-  const btn = toNutButton(button)
-  if (count >= 2) {
-    await mouse.doubleClick(btn)
-  } else {
-    await mouse.click(btn)
+  if (routing.os === 'win32') {
+    await mouseClickWindows(button, count)
+    return
   }
+  // darwin
+  void info
+  void code
+  await mouseClickMac(button, count)
 }
 
 export async function mouseDown(button: MouseButton): Promise<void> {
@@ -124,8 +106,14 @@ export async function mouseDown(button: MouseButton): Promise<void> {
     runCli(tool, ['mousedown', String(code)])
     return
   }
-  // macOS / Windows
-  await mouse.pressButton(toNutButton(button))
+  if (routing.os === 'win32') {
+    await mouseDownWindows(button)
+    return
+  }
+  // darwin
+  void info
+  void code
+  await mouseDownMac(button)
 }
 
 export async function mouseUp(button: MouseButton): Promise<void> {
@@ -139,8 +127,14 @@ export async function mouseUp(button: MouseButton): Promise<void> {
     runCli(tool, ['mouseup', String(code)])
     return
   }
-  // macOS / Windows
-  await mouse.releaseButton(toNutButton(button))
+  if (routing.os === 'win32') {
+    await mouseUpWindows(button)
+    return
+  }
+  // darwin
+  void info
+  void code
+  await mouseUpMac(button)
 }
 
 /**
@@ -211,22 +205,10 @@ export async function getMousePosition(): Promise<{ x: number; y: number }> {
     requireTool(info.tools, 'ydotool', routing)
     return readShellLocation('ydotool', ['getmouselocation'])
   }
-  // macOS / Windows — @nut-tree-fork/nut-js
-  try {
-    const pos = await mouse.getPosition()
-    if (!Number.isInteger(pos.x) || !Number.isInteger(pos.y)) {
-      throw new DaMcpError(
-        'NATIVE_FAILED',
-        `mouse.getPosition() returned non-integer coords: x=${String(pos.x)}, y=${String(pos.y)}`,
-      )
-    }
-    return { x: pos.x, y: pos.y }
-  } catch (e) {
-    if (e instanceof DaMcpError) throw e
-    throw new DaMcpError(
-      'NATIVE_FAILED',
-      'mouse.getPosition() failed',
-      e instanceof Error ? e : undefined,
-    )
+  if (routing.os === 'win32') {
+    return getMousePositionWindows()
   }
+  // darwin
+  void info
+  return getMousePositionMac()
 }

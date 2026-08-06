@@ -14,7 +14,7 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 - **`da_list_displays`** — List connected displays with id, bounds, scale factor.
 
 ### Input
-- **`da_get_mouse_position`** — Read current cursor position (X11/Linux uses `xdotool getmouselocation --shell`, Wayland uses `ydotool`, macOS/Windows uses `@nut-tree-fork/nut-js`).
+- **`da_get_mouse_position`** — Read current cursor position (Linux X11 uses `xdotool getmouselocation --shell`, Wayland uses `ydotool`, Windows uses PowerShell + `user32!GetCursorPos`). macOS is stubbed in v1.0.0 — surfaces a "not implemented" error (tracked by #19).
 - **`da_move_mouse`** — Move the cursor to (x, y).
 - **`da_click`** — Click at (x, y) with optional button (left/right/middle/back/forward) and count.
 - **`da_click_text`** — OCR-then-click: find a UI element by visible text (exact or fuzzy) and click its center. Returns `NOT_FOUND` if no match.
@@ -72,9 +72,9 @@ The `da_ocr` classifier tags each detected text region with one of:
 - **Language**: TypeScript 7.0 (strict, ESM, Node 22+); `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch` all on. Exact version pins (no `^`/`~`).
 - **MCP SDK**: v2 (`@modelcontextprotocol/server@2.0.0`) over `StdioServerTransport` (production) and `InMemoryTransport` (tests).
 - **Module layout** (250 LOC ceiling per file):
-  - **Screenshot** — `src/screenshot/{png,backends,index,types}.ts`. PNG validation/encoding isolated in `png.ts`; backend dispatch (node-screenshots → screenshot-desktop → Windows CLI) in `backends.ts`.
+  - **Screenshot** — `src/screenshot/{png,backends,index,types}.ts`. PNG validation/encoding isolated in `png.ts`; backend dispatch (`screenshot-desktop` → OS CLI shell-out: `scrot`/`grim`/`screencapture`/PowerShell BitBlt) in `backends.ts`. No native NAPI binary — see #12.
   - **OCR** — `src/ocr/{cli,index,mock,parse,wasm,types,classify,classify-rules}.ts`. CLI backend (`runCli`), WASM fallback (`runWasm`), parser, mock; orchestrator in `index.ts` rethrows as `OCR_FAILED` when both backends fail.
-  - **Input** — `src/input/{routing,mouse,keyboard,scroll,drag,types,index}.ts`. Shared routing helpers (`runCli`, `resolveRouting`, `requireTool`, `isMockMode`, `validateCoords`, `Routing`) in `routing.ts`; per-input-type operations in dedicated files. macOS/Windows path uses `@nut-tree-fork/nut-js` (libnut), statically imported.
+  - **Input** — `src/input/{routing,mouse,keyboard,scroll,drag,types,index}.ts` plus per-OS backends `mouse-{macos,windows}.ts`, `keyboard-{macos,windows}.ts`, `scroll-{macos,windows}.ts`, `clipboard.ts`. Shared routing helpers (`runCli`, `resolveRouting`, `requireTool`, `isMockMode`, `validateCoords`, `Routing`) in `routing.ts`. Linux paths shell out to `xdotool`/`ydotool`/`wtype`. Windows path uses PowerShell + `user32` (`keybd_event`, `mouse_event`, `SetCursorPos`, `GetCursorPos`); Unicode text goes via clipboard + Ctrl+V. macOS is a stub in v1.0.0 (tracked by #19) — surfaces a "not implemented in #13" error. No native NAPI binary — see #13.
   - **Launch** — `src/launch/{launch,types}.ts`. `open(1)` + `child_process.spawn` (shell:false); `SIGNAL_EXIT_CODES` map for POSIX signal mapping.
   - **Platform** — `src/platform/{detect,types}.ts`. `detectPlatform()` returns `{ os, display, tools, home }`; `assertPlatformSupported()` throws `PLATFORM_INIT_FAILED` on unsupported combos.
   - **Server** — `src/server.ts`. Registers 14 tools, wraps handler results into `CallToolResult` with `structuredContent` (Buffers stripped to `number[]` for JSON-safety), installs SIGINT/SIGTERM shutdown.
@@ -85,13 +85,14 @@ The `da_ocr` classifier tags each detected text region with one of:
 
 | Capability | Primary | Fallback 1 | Fallback 2 |
 |---|---|---|---|
-| Screenshot (Linux X11) | `node-screenshots` (XCap) | `screenshot-desktop` | — |
-| Screenshot (Linux Wayland) | `node-screenshots` (XCap portal) | `screenshot-desktop` | — |
-| Screenshot (macOS) | `node-screenshots` (CG) | `screencapture` | — |
-| Screenshot (Windows) | `node-screenshots` (GDI) | PowerShell BitBlt (`windowsCliBackend`, ships in `backends.ts`) | — |
+| Screenshot (Linux X11) | `screenshot-desktop` (X11) | `scrot` | — |
+| Screenshot (Linux Wayland) | `screenshot-desktop` (XWayland portal) | `grim` | — |
+| Screenshot (macOS) | `screenshot-desktop` (CG via wrapper) | `screencapture` | — |
+| Screenshot (Windows) | `screenshot-desktop` (GDI wrapper) | PowerShell BitBlt (`windowsCliBackend`, ships in `backends.ts`) | — |
 | Input (Linux X11) | `xdotool` CLI | — | — |
 | Input (Linux Wayland) | `ydotool` CLI | `wtype` (keyboard only) | — |
-| Input (macOS / Windows) | `@nut-tree-fork/nut-js` (libnut, ships prebuilt binaries) | — | — |
+| Input (Windows) | PowerShell + `user32` (`keybd_event`, `mouse_event`, `SetCursorPos`, `GetCursorPos`); Unicode text via clipboard + Ctrl+V | — | — |
+| Input (macOS) | Stub in v1.0.0 — surfaces "not implemented in #13" error (tracked by #19) | — | — |
 | OCR (any OS) | `tesseract` CLI | `tesseract.js@7` WASM | — |
 | Window list + focus (Linux) | `wmctrl` CLI (X11 + XWayland on Wayland) | — | — |
 | Window list + focus (macOS) | `osascript` + System Events | — | — |
@@ -285,10 +286,10 @@ Start the server with `DA_MCP_TRANSPORT=http` (see [HTTP section](#http-opt-in-t
 
 | OS | Screenshot | Input | Notes |
 |---|---|---|---|
-| Linux X11 | `node-screenshots` (X11 native) | `xdotool` | `wmctrl` for window list/focus (installed by `install-system-deps.sh`); x11-server-utils + XCap deps (handled by `install-system-deps.sh`) |
-| Linux Wayland | `node-screenshots` (XCap portal) | `ydotool` (daemon) | `wmctrl` works via XWayland if XWayland apps are present |
-| macOS | `node-screenshots` (CG) | `@nut-tree-fork/nut-js` (CGEvent) | First call needs Screen Recording permission (TCC) |
-| Windows | `node-screenshots` (GDI) | `@nut-tree-fork/nut-js` (SendInput) | PowerShell BitBlt fallback if GDI fails |
+| Linux X11 | `screenshot-desktop` (X11) | `xdotool` | `wmctrl` for window list/focus (installed by `install-system-deps.sh`) |
+| Linux Wayland | `screenshot-desktop` (XWayland portal) | `ydotool` (daemon) | `wmctrl` works via XWayland if XWayland apps are present |
+| macOS | `screenshot-desktop` (CG via wrapper) | Stub in v1.0.0 — see #19; Windows SEA binary is the recommended path | First screenshot call may need Screen Recording permission (TCC) |
+| Windows | `screenshot-desktop` (GDI wrapper); PowerShell BitBlt fallback | PowerShell + `user32` (`keybd_event`, `mouse_event`, `SetCursorPos`) | The v1.0.0 single-binary release target — no native NAPI deps |
 
 ## Development
 
@@ -308,8 +309,8 @@ npx vitest
 
 ### Test inventory
 
-- **20 test files**: 18 unit (`test/unit/`) + 2 e2e (`test/e2e/`)
-- **322 tests passing / 18 skipped** in mock mode (e2e require real X11/tesseract)
+- **27 unit test files + 2 e2e** (e2e skip in mock mode)
+- **358 tests passing / 18 skipped / 0 failed** in `DA_MCP_TEST_MODE=mock npm test` (e2e require real X11/tesseract; input dispatcher tests cover per-OS stubs for macOS + Windows PowerShell paths)
 - **Test runtime**: `process.env['DA_MCP_TEST_MODE'] === 'mock'` short-circuits native calls; `_mock.ts` modules inject deterministic native modules
 
 ### Conventions

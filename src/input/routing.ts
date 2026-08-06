@@ -5,7 +5,7 @@
  * uniform across OS+display combinations:
  *   Linux + X11     → xdotool CLI
  *   Linux + Wayland → ydotool / wtype CLI
- *   macOS / Windows → @nut-tree-fork/nut-js (native, statically imported)
+ *   macOS / Windows → shell-out (osascript on macOS, PowerShell+user32 on Windows)
  *   unknown         → throw DaMcpError('NATIVE_MISSING')
  *
  * Every spawnSync / spawn call uses shell:false. Bounds validation runs at

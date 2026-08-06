@@ -30,8 +30,8 @@ describe('platform/types', () => {
       xdotool: boolean
       ydotool: boolean
       wtype: boolean
+      wmctrl: boolean
       screenshotDesktop: boolean
-      nutjs: boolean
       tesseract: boolean
       scrot: boolean
       grim: boolean

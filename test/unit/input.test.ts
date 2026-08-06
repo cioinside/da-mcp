@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { Key } from '@nut-tree-fork/nut-js'
 import { initConfig, getConfig, resetConfig } from '../../src/config.js'
 import { DaMcpError } from '../../src/errors.js'
 import {
@@ -14,7 +13,6 @@ import {
   mouseScroll,
   mouseDrag,
 } from '../../src/input/index.js'
-import { toNutModifier, toNutKey } from '../../src/input/keyboard.js'
 
 const TRACKED = ['DA_MCP_TEST_MODE', 'DA_MCP_MAX_TYPE_BYTES'] as const
 type TrackedKey = (typeof TRACKED)[number]
@@ -166,115 +164,11 @@ describe('mouseDrag', () => {
   })
 })
 
-// ---- toNutModifier ------------------------------------------------------------
-// Regression tests for the MCP-modifier → nut.js Key enum translation.
-// Pick Left* variants so chord presses don't desync the modifier state.
-
-describe('toNutModifier', () => {
-  it('translates "ctrl" → Key.LeftControl', () => {
-    expect(toNutModifier('ctrl')).toBe(Key.LeftControl)
-  })
-
-  it('translates "alt" → Key.LeftAlt', () => {
-    expect(toNutModifier('alt')).toBe(Key.LeftAlt)
-  })
-
-  it('translates "shift" → Key.LeftShift', () => {
-    expect(toNutModifier('shift')).toBe(Key.LeftShift)
-  })
-
-  it('translates "meta" → Key.LeftMeta', () => {
-    expect(toNutModifier('meta')).toBe(Key.LeftMeta)
-  })
-
-  it('translates "super" → Key.LeftSuper', () => {
-    expect(toNutModifier('super')).toBe(Key.LeftSuper)
-  })
-
-  it('throws DaMcpError INVALID_ARGUMENT for unknown modifier names', () => {
-    expect(() => toNutModifier('hyper')).toThrow(DaMcpError)
-    try {
-      toNutModifier('hyper')
-    } catch (err) {
-      expect(DaMcpError.is(err)).toBe(true)
-      if (DaMcpError.is(err)) {
-        expect(err.code).toBe('INVALID_ARGUMENT')
-      }
-    }
-  })
-})
-
-// ---- toNutKey -----------------------------------------------------------------
-
-describe('toNutKey', () => {
-  it('uppercases single-character keys (a → Key.A)', () => {
-    expect(toNutKey('a')).toBe(Key.A)
-  })
-
-  it('uppercases single-character keys (z → Key.Z)', () => {
-    expect(toNutKey('z')).toBe(Key.Z)
-  })
-
-  it('uppercases single-character keys (already-uppercase A stays Key.A)', () => {
-    expect(toNutKey('A')).toBe(Key.A)
-  })
-
-  it('prefixes single digits with "Num" (0 → Key.Num0)', () => {
-    expect(toNutKey('0')).toBe(Key.Num0)
-  })
-
-  it('prefixes single digits with "Num" (9 → Key.Num9)', () => {
-    expect(toNutKey('9')).toBe(Key.Num9)
-  })
-
-  it('normalises "BackSpace" → "Backspace"', () => {
-    expect(toNutKey('BackSpace')).toBe(Key.Backspace)
-  })
-
-  it('normalises "Num_Lock" → "NumLock"', () => {
-    expect(toNutKey('Num_Lock')).toBe(Key.NumLock)
-  })
-
-  it('normalises "Page_Up" → "PageUp"', () => {
-    expect(toNutKey('Page_Up')).toBe(Key.PageUp)
-  })
-
-  it('normalises "Page_Down" → "PageDown"', () => {
-    expect(toNutKey('Page_Down')).toBe(Key.PageDown)
-  })
-
-  it('looks up "Return" in the Key enum', () => {
-    expect(toNutKey('Return')).toBe(Key.Return)
-  })
-
-  it('looks up "Enter" in the Key enum', () => {
-    expect(toNutKey('Enter')).toBe(Key.Enter)
-  })
-
-  it('looks up "F5" in the Key enum', () => {
-    expect(toNutKey('F5')).toBe(Key.F5)
-  })
-
-  it('looks up "Tab" in the Key enum', () => {
-    expect(toNutKey('Tab')).toBe(Key.Tab)
-  })
-
-  it('throws DaMcpError INVALID_ARGUMENT for unknown key names', () => {
-    expect(() => toNutKey('not_a_real_key')).toThrow(DaMcpError)
-    try {
-      toNutKey('not_a_real_key')
-    } catch (err) {
-      expect(DaMcpError.is(err)).toBe(true)
-      if (DaMcpError.is(err)) {
-        expect(err.code).toBe('INVALID_ARGUMENT')
-      }
-    }
-  })
-
-  it('throws DaMcpError INVALID_ARGUMENT for empty string', () => {
-    // Empty string is single-char (length === 1) but uppercases to itself;
-    // Key[''] is undefined so the lookup fails. Be explicit about the
-    // contract rather than treating it as a silent passthrough.
-    expect(() => toNutKey('')).toThrow(DaMcpError)
-  })
-})
+// ---- per-OS round-trip regression suite ------------------------------------
+// The cross-platform key/modifier → enum translation that used to live here
+// (`toNutKey` / `toNutModifier`) was retired in #13 when @nut-tree-fork/nut-js
+// was dropped from the dependency tree. Per-OS mapping now lives in
+// `keyboard-{macos,windows}.ts`; the Linux (xdotool/ydotool) path takes the
+// raw MCP `KeyName` string directly. The new dispatcher surfaces are
+// exercised end-to-end via the `keyTap` / `keyDown` / `keyUp` / `typeText`
+// describe blocks above.

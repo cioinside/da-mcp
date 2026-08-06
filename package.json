@@ -27,8 +27,6 @@
   "dependencies": {
     "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
-    "open": "11.0.0",
-    "@nut-tree-fork/nut-js": "4.2.6",
     "screenshot-desktop": "1.15.4",
     "tesseract.js": "7.0.0",
     "zod": "4.4.3"

@@ -1,22 +1,20 @@
 /**
  * Unit tests for src/input/mouse.ts — focused on getMousePosition().
  *
- * Unlike the existing test/unit/input.test.ts which exercises mouse operations
- * under DA_MCP_TEST_MODE=mock (the mock short-circuits all native calls), this
- * file drives getMousePosition() under DA_MCP_TEST_MODE=real with three layers
+ * Drives getMousePosition() under DA_MCP_TEST_MODE=real with two layers
  * of mocking:
- *   - ../../src/platform/detect.js   → forced to a per-test PlatformInfo
- *   - @nut-tree-fork/nut-js           → mouse.getPosition stub
- *   - node:child_process              → spawnSync stub returning canned stdout
+ *   - ../../src/platform/detect.js → forced to a per-test PlatformInfo
+ *   - node:child_process            → spawnSync stub returning canned stdout
  *
  * Coverage:
  *   1. Linux X11: parses X=NNN / Y=NNN out of `xdotool getmouselocation --shell`.
- *   2. macOS:     returns mouse.getPosition() directly.
+ *   2. macOS:     stubbed in #13 (tracked by #19); the dispatcher surfaces
+ *                 the "not implemented" error verbatim so the agent can
+ *                 route the user to a Windows SEA binary or a Linux build.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import * as cp from 'node:child_process'
-import { mouse } from '@nut-tree-fork/nut-js'
 
 import { initConfig, resetConfig } from '../../src/config.js'
 import { detectPlatform } from '../../src/platform/detect.js'
@@ -25,21 +23,6 @@ import type { PlatformInfo } from '../../src/platform/types.js'
 
 vi.mock('../../src/platform/detect.js', () => ({
   detectPlatform: vi.fn(),
-}))
-
-vi.mock('@nut-tree-fork/nut-js', () => ({
-  mouse: {
-    setPosition: vi.fn(),
-    getPosition: vi.fn(),
-    click: vi.fn(),
-    doubleClick: vi.fn(),
-    pressButton: vi.fn(),
-    releaseButton: vi.fn(),
-    scrollDown: vi.fn(),
-    scrollUp: vi.fn(),
-    scrollLeft: vi.fn(),
-    scrollRight: vi.fn(),
-  },
 }))
 
 vi.mock('node:child_process', () => ({
@@ -61,8 +44,8 @@ function platformX11(): PlatformInfo {
       xdotool: true,
       ydotool: false,
       wtype: false,
+      wmctrl: false,
       screenshotDesktop: false,
-      nutjs: false,
       tesseract: false,
       scrot: false,
       grim: false,
@@ -81,8 +64,8 @@ function platformMac(): PlatformInfo {
       xdotool: false,
       ydotool: false,
       wtype: false,
+      wmctrl: false,
       screenshotDesktop: false,
-      nutjs: true,
       tesseract: false,
       scrot: false,
       grim: false,
@@ -98,7 +81,6 @@ beforeEach(() => {
   initConfig({ DA_MCP_TEST_MODE: 'real' })
   vi.mocked(cp.spawnSync).mockReset()
   vi.mocked(detectPlatform).mockReset()
-  vi.mocked(mouse.getPosition).mockReset()
 })
 
 afterEach(() => {
@@ -131,11 +113,10 @@ describe('getMousePosition', () => {
     )
   })
 
-  it('returns nut.js mouse coords on macOS', async () => {
+  it('macOS is a stub in #13 — getMousePosition throws "not implemented" (#19)', async () => {
     vi.mocked(detectPlatform).mockReturnValue(platformMac())
-    vi.mocked(mouse.getPosition).mockResolvedValue({ x: 50, y: 60 })
-    const pos = await getMousePosition()
-    expect(pos).toEqual({ x: 50, y: 60 })
-    expect(mouse.getPosition).toHaveBeenCalledTimes(1)
+    await expect(getMousePosition()).rejects.toThrow(
+      /macOS getMousePosition is not implemented in #13/i,
+    )
   })
 })

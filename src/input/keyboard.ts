@@ -1,22 +1,22 @@
 /**
- * Keyboard operations: keyTap / keyDown / keyUp / typeText.
+ * Keyboard operations — public dispatch entry point.
  *
- * Routing per OS+display server:
- *   Linux + X11     → xdotool CLI
- *   Linux + Wayland → ydotool CLI (keyboard + mouse, unified)
- *   Linux + Wayland + typeText → wtype CLI
- *   macOS / Windows → @nut-tree-fork/nut-js (libnut native, statically imported)
- *   unknown         → throw DaMcpError('NATIVE_MISSING')
+ * Per-OS backends live in `./keyboard-{macos,windows}.ts`. Linux paths
+ * stay inline (xdotool / ydotool / wtype).
  *
- * All spawnSync calls use shell:false. text containing NUL is rejected
- * defensively (the CLI tools handle metacharacters differently); oversize
- * text is rejected by getConfig().maxTypeBytes.
+ *   Linux + X11 / typeText on any Linux → xdotool CLI (Unicode-native)
+ *   Linux + Wayland + key/click   → ydotool CLI
+ *   Linux + Wayland + typeText    → wtype CLI
+ *   Windows                        → PowerShell + user32!keybd_event (keyboard-windows.ts)
+ *   macOS                          → osascript (keyboard-macos.ts; v1.0.0 stub, deferred to #19)
  *
- * Helpers (runCli, resolveRouting, requireTool, isMockMode) are reused
- * from ./routing.js to keep dispatch uniform.
+ * Modifier keys: hold modifier → press key → release key → release
+ * modifier on every OS. `try/finally` guarantees cleanup on every code
+ * path (pattern from `da_draw_path` for issue #10).
+ *
+ * Unicode text input on Windows: write to clipboard via `setClipboard`,
+ * then send Ctrl+V. Same pattern will apply to macOS via #19.
  */
-
-import { keyboard, Key } from '@nut-tree-fork/nut-js'
 import { getConfig } from '../config.js'
 import { DaMcpError } from '../errors.js'
 import { detectPlatform } from '../platform/detect.js'
@@ -28,65 +28,13 @@ import {
   resolveRouting,
   runCli,
 } from './routing.js'
+import { keyTapMac, keyDownMac, keyUpMac, typeTextMac } from './keyboard-macos.js'
+import { keyTapWindows, keyDownWindows, keyUpWindows, typeAsciiWindows } from './keyboard-windows.js'
+import { setClipboard } from './clipboard.js'
 
-/** Build a chord string for xdotool/ydotool: ['ctrl', 'shift'] + 'a' → 'ctrl+shift+a'. */
-function buildChord(key: KeyName, modifiers: readonly Modifier[]): string {
-  if (modifiers.length === 0) return key
-  return [...modifiers, key].join('+')
-}
-
-/**
- * Map MCP modifier names (per the JSON-Schema enum in src/platform/types.ts)
- * to nut.js Key enum values. nut.js exposes LeftControl / LeftShift / LeftAlt
- * / LeftMeta / LeftSuper — pick the "left" variant so subsequent Right* keys
- * don't desync the modifier state on chord presses.
- *
- * Exported for unit tests; not part of the public input API.
- */
-export function toNutModifier(name: string): Key {
-  switch (name) {
-    case 'ctrl': return Key.LeftControl
-    case 'alt': return Key.LeftAlt
-    case 'shift': return Key.LeftShift
-    case 'meta': return Key.LeftMeta
-    case 'super': return Key.LeftSuper
-    default:
-      throw new DaMcpError(
-        'INVALID_ARGUMENT',
-        `unsupported modifier '${name}'; expected one of ctrl|alt|shift|meta|super`,
-      )
-  }
-}
-
-/**
- * Normalize MCP key names (X11-style per src/platform/types.ts KeyName
- * comment) to nut.js Key enum members and look them up. Handles the few
- * X11 names that differ from nut.js casing and the per-character mapping
- * for letters + digits. Throws INVALID_ARGUMENT on unknown names.
- *
- * Exported for unit tests; not part of the public input API.
- */
-export function toNutKey(name: string): Key {
-  let normalized = name
-  if (name === 'BackSpace') {
-    normalized = 'Backspace'
-  } else if (name === 'Num_Lock') {
-    normalized = 'NumLock'
-  } else if (name === 'Page_Up') {
-    normalized = 'PageUp'
-  } else if (name === 'Page_Down') {
-    normalized = 'PageDown'
-  } else if (name.length === 1 && /^[0-9]$/.test(name)) {
-    normalized = `Num${name}`
-  } else if (name.length === 1 && /^[a-z]$/.test(name)) {
-    normalized = name.toUpperCase()
-  } else if (name.length === 0) {
-    throw new DaMcpError('INVALID_ARGUMENT', 'unsupported key name \'\'')
-  }
-  if (normalized in Key) {
-    return Key[normalized as keyof typeof Key]
-  }
-  throw new DaMcpError('INVALID_ARGUMENT', `unsupported key name '${name}'`)
+/** ASCII-only: any char in the BMP outside the 7-bit range. */
+function isAsciiOnly(text: string): boolean {
+  return !/[^\x00-\x7F]/.test(text)
 }
 
 export async function keyTap(
@@ -95,15 +43,15 @@ export async function keyTap(
   opts?: KeyOptions,
 ): Promise<void> {
   const mods = modifiers ?? []
-  void opts
+  const holdMs = opts?.holdMs ?? 0
+  void mods
+  void holdMs
   if (isMockMode()) return
   const routing = resolveRouting()
   const info = detectPlatform()
-  const chord = buildChord(key, mods)
 
-  // Optional hold-then-release path (only when no modifiers, for V1 simplicity).
-  const holdMs = opts?.holdMs ?? 0
-  if (holdMs > 0 && mods.length === 0) {
+  // Optional hold-then-release path (no modifiers, for V1 simplicity).
+  if (holdMs > 0 && mods.length === 0 && (routing.os === 'linux' || routing.os === 'win32')) {
     await keyDown(key)
     await new Promise<void>((resolve) => setTimeout(resolve, holdMs))
     await keyUp(key)
@@ -112,20 +60,23 @@ export async function keyTap(
 
   if (routing.os === 'linux' && routing.display === 'x11') {
     requireTool(info.tools, 'xdotool', routing)
+    const chord = mods.length === 0 ? key : [...mods, key].join('+')
     runCli('xdotool', ['key', '--clearmodifiers', chord])
     return
   }
   if (routing.os === 'linux' && routing.display === 'wayland') {
     requireTool(info.tools, 'ydotool', routing)
+    const chord = mods.length === 0 ? key : [...mods, key].join('+')
     runCli('ydotool', ['key', chord])
     return
   }
-  // macOS / Windows — @nut-tree-fork/nut-js.
-  // pressKey / releaseKey accept modifier+key as separate positional args.
-  const modKeys = mods.map(toNutModifier)
-  const rkey = toNutKey(key)
-  await keyboard.pressKey(...modKeys, rkey)
-  await keyboard.releaseKey(...modKeys, rkey)
+  if (routing.os === 'win32') {
+    await keyTapWindows(key, mods)
+    return
+  }
+  // darwin
+  void info
+  await keyTapMac(key, mods)
 }
 
 export async function keyDown(
@@ -148,9 +99,13 @@ export async function keyDown(
     runCli('ydotool', ['keydown', key])
     return
   }
-  // macOS / Windows
-  const modKeys = mods.map(toNutModifier)
-  await keyboard.pressKey(...modKeys, toNutKey(key))
+  if (routing.os === 'win32') {
+    await keyDownWindows(key, mods)
+    return
+  }
+  // darwin
+  void info
+  await keyDownMac(key, mods)
 }
 
 export async function keyUp(
@@ -173,9 +128,13 @@ export async function keyUp(
     for (const m of mods) runCli('ydotool', ['keyup', m])
     return
   }
-  // macOS / Windows
-  const modKeys = mods.map(toNutModifier)
-  await keyboard.releaseKey(...modKeys, toNutKey(key))
+  if (routing.os === 'win32') {
+    await keyUpWindows(key, mods)
+    return
+  }
+  // darwin
+  void info
+  await keyUpMac(key, mods)
 }
 
 export async function typeText(text: string, opts?: TypeOptions): Promise<void> {
@@ -209,14 +168,18 @@ export async function typeText(text: string, opts?: TypeOptions): Promise<void> 
     runCli('wtype', ['--delay', String(perCharDelayMs), text])
     return
   }
-  // macOS / Windows — nut.js exposes per-character delay via
-  // keyboard.config.autoDelayMs. Set + restore around the call so concurrent
-  // callers don't observe each other's delay settings.
-  const prev = keyboard.config.autoDelayMs
-  keyboard.config.autoDelayMs = perCharDelayMs
-  try {
-    await keyboard.type(text)
-  } finally {
-    keyboard.config.autoDelayMs = prev
+  if (routing.os === 'win32') {
+    if (isAsciiOnly(text)) {
+      await typeAsciiWindows(text, perCharDelayMs)
+      return
+    }
+    // Unicode path: clipboard + Ctrl+V.
+    setClipboard(text, 'win32')
+    await keyTapWindows('v', ['ctrl'])
+    return
   }
+  // darwin
+  void info
+  void perCharDelayMs
+  await typeTextMac(text)
 }
