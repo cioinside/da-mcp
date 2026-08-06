@@ -52,6 +52,7 @@ The `da_ocr` classifier tags each detected text region with one of:
   - **Launch** — `src/launch/{launch,types}.ts`. `open(1)` + `child_process.spawn` (shell:false); `SIGNAL_EXIT_CODES` map for POSIX signal mapping.
   - **Platform** — `src/platform/{detect,types}.ts`. `detectPlatform()` returns `{ os, display, tools, home }`; `assertPlatformSupported()` throws `PLATFORM_INIT_FAILED` on unsupported combos.
   - **Server** — `src/server.ts`. Registers 12 tools, wraps handler results into `CallToolResult` with `structuredContent` (Buffers stripped to `number[]` for JSON-safety), installs SIGINT/SIGTERM shutdown.
+  - **Server instructions** — `src/server-instructions.ts`. Exports `SERVER_INSTRUCTIONS`, a string surfaced to the AI agent via the MCP `instructions` field (MCP spec, `ServerOptions.instructions`). Tells the agent it IS the orchestrator — call the 12 `da_*` tools directly through the MCP client, do NOT write an orchestrator script that imports/spawns the server. Edit this string to update the agent-facing announcement.
 
 ### Backend dispatch
 
@@ -185,7 +186,7 @@ npx vitest
 ### Test inventory
 
 - **18 test files**: 15 unit (`test/unit/`) + 3 e2e (`test/e2e/`)
-- **216 tests passing / 17 skipped** in mock mode (e2e require real X11/tesseract)
+- **261 tests passing / 18 skipped** in mock mode (e2e require real X11/tesseract)
 - **Test runtime**: `process.env['DA_MCP_TEST_MODE'] === 'mock'` short-circuits native calls; `_mock.ts` modules inject deterministic native modules
 
 ### Conventions

@@ -82,6 +82,17 @@ describe('mcp wire-protocol lifecycle', () => {
     await server.close()
   })
 
+  it('initialize returns the server instructions to the client', async () => {
+    const { client, server } = await setupPair()
+    const r = asResult(
+      await rpc(client, { jsonrpc: '2.0', id: 1, method: 'initialize', params: INIT }),
+    ) as { instructions?: string }
+    expect(typeof r.instructions).toBe('string')
+    expect(r.instructions?.length ?? 0).toBeGreaterThan(0)
+    expect(r.instructions).toContain('Do NOT write an orchestrator script')
+    await server.close()
+  })
+
   it('tools/list returns exactly 12 tools with name/description/inputSchema', async () => {
     const { client } = await setupPair()
     const r = asResult(

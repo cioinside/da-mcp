@@ -16,6 +16,7 @@ import { initConfig, resetConfig } from '../../src/config.js'
 import { DaMcpError } from '../../src/errors.js'
 import { ALL_TOOLS } from '../../src/tools/index.js'
 import { createMcpServer, wrapHandlerResult } from '../../src/server.js'
+import { SERVER_INSTRUCTIONS } from '../../src/server-instructions.js'
 
 const TRACKED = ['DA_MCP_TEST_MODE'] as const
 type TrackedKey = (typeof TRACKED)[number]
@@ -89,6 +90,37 @@ describe('createMcpServer', () => {
     const a = createMcpServer()
     const b = createMcpServer()
     expect(a).not.toBe(b)
+  })
+
+  it('wires SERVER_INSTRUCTIONS into the McpServer instance', () => {
+    const server = createMcpServer()
+    const innerServer = (server as unknown as {
+      server: { _instructions?: string }
+    }).server
+    expect(innerServer._instructions).toBe(SERVER_INSTRUCTIONS)
+  })
+})
+
+describe('SERVER_INSTRUCTIONS', () => {
+  it('is a non-empty string', () => {
+    expect(typeof SERVER_INSTRUCTIONS).toBe('string')
+    expect(SERVER_INSTRUCTIONS.length).toBeGreaterThan(0)
+  })
+
+  it('mentions every da_* tool exposed by the server', () => {
+    for (const tool of ALL_TOOLS) {
+      expect(SERVER_INSTRUCTIONS).toContain(tool.name)
+    }
+  })
+
+  it('explicitly forbids writing an orchestrator script', () => {
+    expect(SERVER_INSTRUCTIONS).toContain('Do NOT write an orchestrator script')
+    expect(SERVER_INSTRUCTIONS).toContain('child_process.spawn')
+    expect(SERVER_INSTRUCTIONS).toMatch(/single|direct/)
+  })
+
+  it('identifies the AI agent as the orchestrator', () => {
+    expect(SERVER_INSTRUCTIONS).toMatch(/ARE the orchestrator/)
   })
 })
 

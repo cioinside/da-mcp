@@ -17,6 +17,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import type { ZodType } from 'zod'
 import { ALL_TOOLS } from './tools/index.js'
 import { SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION } from './version.js'
+import { SERVER_INSTRUCTIONS } from './server-instructions.js'
 import { DaMcpError, toDaMcpError, type ErrorCode } from './errors.js'
 import { initConfig, getConfig } from './config.js'
 import { getLogger } from './log.js'
@@ -24,7 +25,6 @@ import { getLogger } from './log.js'
 interface ErrorEnvelope {
   code: ErrorCode
   message: string
-  hint?: string
   cause?: string
 }
 
@@ -112,7 +112,7 @@ function asStandardSchema<S extends ZodType>(schema: S): StandardSchemaWithJSON 
 export function createMcpServer(): McpServer {
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} }, instructions: SERVER_INSTRUCTIONS },
   )
   for (const tool of ALL_TOOLS) {
     const inputSchema = asStandardSchema(tool.inputSchema)
