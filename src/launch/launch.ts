@@ -155,14 +155,29 @@ function isUrl(s: string): boolean {
 }
 
 function resolveProgram(program: string): string {
-  // Absolute or relative path: skip PATH lookup, verify executable bit directly.
+  // Absolute or relative path: skip PATH lookup, verify file exists directly.
   if (program.includes('/') || program.includes('\\')) {
     try {
-      accessSync(program, fsConstants.X_OK)
+      // On Windows, X_OK is essentially a no-op (NTFS doesn't track an exec
+      // bit; X_OK only verifies the file is readable). F_OK verifies the file
+      // actually exists at the path, which is what we want before spawn().
+      // On POSIX, keep X_OK so non-executable files (e.g. /etc/passwd) are
+      // correctly rejected.
+      const mode = process.platform === 'win32' ? fsConstants.F_OK : fsConstants.X_OK
+      accessSync(program, mode)
     } catch {
       throw new DaMcpError('ENOENT', `Program not found: ${program}`)
     }
     return program
+  }
+  // On Windows, walk PATH manually with PATHEXT instead of relying on `which`.
+  // `which` is Git-for-Windows-specific and is NOT on PATH on stock Windows
+  // installs, CI runners, and many production environments — so spawning
+  // `which` always returned ENOENT there, breaking bare-name launch for every
+  // program. resolveWindowsPath uses only Node + stdlib to walk PATH/PATHEXT,
+  // matching the behaviour of CreateProcessW.
+  if (process.platform === 'win32') {
+    return resolveWindowsPath(program)
   }
   // PATH lookup via `which`. shell:false, capture stdout to learn the resolved path.
   const which = spawnSync('which', [program], {
@@ -182,6 +197,58 @@ function resolveProgram(program: string): string {
   // Windows paths before returning. No-op on POSIX or already-converted paths.
   resolved = msysToWindowsPath(resolved)
   return resolved
+}
+
+/**
+ * Native Windows PATH resolver — walks `PATH` directories and tries each
+ * extension in `PATHEXT` (plus the bare name). Returns the first existing
+ * file, or throws ENOENT if none match.
+ *
+ * `PATH` and `PATHEXT` are both `;`-delimited. `PATHEXT` defaults to
+ * `.EXE;.CMD;.BAT;.COM` when unset. The candidate is checked with F_OK
+ * (existence), not X_OK — Windows has no exec bit and X_OK is a no-op.
+ *
+ * KNOWN LIMITATION: WindowsApps Store-app proxy entries (e.g. mspaint on
+ * Windows 11) are reparse points that may report EACCES or be invisible to
+ * F_OK from non-Store-aware callers. The user's resolution path is then
+ * expected to fall through to the next PATH entry or fail with ENOENT —
+ * which is correct behaviour, not a bug here. Such apps need to be launched
+ * via the ShellExecute / `start` API rather than spawn().
+ *
+ * Exported for unit tests; not part of the public launch API.
+ */
+export function resolveWindowsPath(program: string): string {
+  const WIN_SEP = String.fromCharCode(92) // '\'
+  const WIN_PATH_SEP = String.fromCharCode(59) // ';'
+  const pathDirs = (process.env['PATH'] ?? '')
+    .split(WIN_PATH_SEP)
+    .filter((s) => s.length > 0)
+  const pathExts = (process.env['PATHEXT'] ?? '.EXE;.CMD;.BAT;.COM')
+    .split(WIN_PATH_SEP)
+    .filter((s) => s.length > 0)
+  for (const dir of pathDirs) {
+    // Try the bare name first (handles cases like `foo.bat` where the user
+    // supplied the extension). PATHEXT entries like `.BAT` would otherwise
+    // produce `foo.bat.BAT`, which doesn't exist.
+    const bare = dir + WIN_SEP + program
+    try {
+      accessSync(bare, fsConstants.F_OK)
+      return bare
+    } catch {
+      // not present — continue
+    }
+    // Then try each PATHEXT extension in order.
+    for (const ext of pathExts) {
+      const candidate = dir + WIN_SEP + program + ext
+      try {
+        accessSync(candidate, fsConstants.F_OK)
+        return candidate
+      } catch {
+        // not present — continue
+      }
+    }
+  }
+  throw new DaMcpError('ENOENT', `Program not found in PATH: ${program}`)
 }
 
 // Spread drops the readonly modifier so Node's mutable stdio array accepts it.
