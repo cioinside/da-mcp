@@ -235,6 +235,8 @@ Open the host firewall for inbound TCP on `DA_MCP_PORT` (default 3000) once per 
 
 ### OpenCode / Claude Desktop example config
 
+#### stdio (default — per-client process)
+
 ```jsonc
 {
   "mcpServers": {
@@ -249,6 +251,47 @@ Open the host firewall for inbound TCP on `DA_MCP_PORT` (default 3000) once per 
   }
 }
 ```
+
+#### HTTP (token-protected — share one daemon across clients / hosts)
+
+The server must already be running with `DA_MCP_TRANSPORT=http`. Get the URL it bound to via:
+
+```bash
+# on the host running the server (prints the full URL with token to stdout):
+node /projects/da-mcp/dist/server-dispatch.js token regenerate
+# or, if installed as a system service:
+journalctl --user -u da-mcp | grep -i 'http server started'
+# → http://<bind-host>:<port>/<43-char-base64url-token>
+```
+
+Replace `<bind-host>` with the LAN IP of the server host (`hostname -I`, `ipconfig getifaddr en0`, `ipconfig`) when configuring a **remote** client — `0.0.0.0` in the server's startup line is just the bind address, not a routable host.
+
+**OpenCode** (`~/.config/opencode/opencode.json`):
+
+```jsonc
+{
+  "mcpServers": {
+    "da-mcp": {
+      "type": "remote",
+      "url": "http://192.168.1.10:3000/<paste-token-here>"
+    }
+  }
+}
+```
+
+**Claude Desktop** (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`; Windows: `%APPDATA%\Claude\claude_desktop_config.json`; Linux: `~/.config/Claude/claude_desktop_config.json`):
+
+```jsonc
+{
+  "mcpServers": {
+    "da-mcp": {
+      "url": "http://192.168.1.10:3000/<paste-token-here>"
+    }
+  }
+}
+```
+
+The token is the **sole auth** — anyone with it can drive mouse, keyboard, screenshots, and program launch on the host. Treat the URL like a password: protect the token file (mode `0o600`), and rotate it (`da-mcp token regenerate`) if it may have leaked. To restrict the server to loopback-only, set `DA_MCP_HTTP_HOST=127.0.0.1` before launch.
 
 ## Cross-platform notes
 
