@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { launchProgram, isShellSafe, SIGNAL_EXIT_CODES } from '../../src/launch/launch.js'
+import { launchProgram, isShellSafe, msysToWindowsPath, SIGNAL_EXIT_CODES } from '../../src/launch/launch.js'
 import { DaMcpError } from '../../src/errors.js'
 import { initConfig, resetConfig } from '../../src/config.js'
 
@@ -73,6 +73,70 @@ describe('isShellSafe', () => {
 
   it('returns true for empty string (no metachars to find)', () => {
     expect(isShellSafe('')).toBe(true)
+  })
+
+  it('returns true for backslash (Windows path separator is not a shell metachar when shell:false)', () => {
+    // Regression test for issue #6: spawn() uses shell:false, so backslashes
+    // never reach a shell. Allowing them lets absolute Windows paths through
+    // (e.g. 'C:\\Windows\\System32\\notepad.exe').
+    expect(isShellSafe('C:\\Windows\\System32\\notepad.exe')).toBe(true)
+  })
+
+  it('still rejects semicolon, pipe, dollar, backtick, newline (no regression)', () => {
+    // Backslash was removed from the regex; the dangerous metachars must stay.
+    expect(isShellSafe('a;b')).toBe(false)
+    expect(isShellSafe('a|b')).toBe(false)
+    expect(isShellSafe('a&b')).toBe(false)
+    expect(isShellSafe('a$b')).toBe(false)
+    expect(isShellSafe('a`b')).toBe(false)
+    expect(isShellSafe('a\nb')).toBe(false)
+  })
+})
+
+// ---- msysToWindowsPath -----------------------------------------------------
+
+describe('msysToWindowsPath', () => {
+  it('converts MSYS-style POSIX path to Windows-native path (issue #5)', () => {
+    // Git for Windows' `which` emits paths like '/c/Windows/System32/notepad.exe'.
+    expect(msysToWindowsPath('/c/Windows/System32/notepad.exe')).toBe(
+      'C:\\Windows\\System32\\notepad.exe',
+    )
+  })
+
+  it('uppercases the drive letter', () => {
+    expect(msysToWindowsPath('/d/Users/foo/bar.exe')).toBe('D:\\Users\\foo\\bar.exe')
+  })
+
+  it('is a no-op on real POSIX paths (no <drive-letter>/ suffix)', () => {
+    // KNOWN LIMITATION: the regex matches ANY /<single-letter>/ pattern, so on
+    // Windows '/usr/bin/git' is also converted (u → U). In practice this rarely
+    // matters because Git for Windows' `which` returns paths under
+    // /c/Program Files/Git/..., where the conversion is correct. On non-Windows
+    // platforms the function is unconditionally a no-op.
+    if (process.platform === 'win32') {
+      expect(msysToWindowsPath('/usr/bin/git')).toBe('U:\\sr\\bin\\git')
+      expect(msysToWindowsPath('/bin/sh')).toBe('B:\\in\\sh')
+    } else {
+      expect(msysToWindowsPath('/usr/bin/git')).toBe('/usr/bin/git')
+      expect(msysToWindowsPath('/bin/sh')).toBe('/bin/sh')
+    }
+  })
+
+  it('is a no-op on paths that do not start with /', () => {
+    expect(msysToWindowsPath('notepad.exe')).toBe('notepad.exe')
+    expect(msysToWindowsPath('C:/Windows/System32/notepad.exe')).toBe(
+      'C:/Windows/System32/notepad.exe',
+    )
+  })
+
+  it('is a no-op on non-Windows platforms (no-op by platform check)', () => {
+    // Verifies the function path-arms the conversion on Windows. On
+    // non-Windows the helper short-circuits to the input unchanged.
+    if (process.platform !== 'win32') {
+      expect(msysToWindowsPath('/c/Windows/System32/notepad.exe')).toBe(
+        '/c/Windows/System32/notepad.exe',
+      )
+    }
   })
 })
 
