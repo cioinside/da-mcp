@@ -35,10 +35,25 @@ function buildChord(key: KeyName, modifiers: readonly Modifier[]): string {
   return [...modifiers, key].join('+')
 }
 
+/** Map MCP modifier names (per the JSON-Schema enum) to robotjs's expected flag names.
+ * robotjs rejects 'ctrl' as "Invalid key flag specified" — it expects 'control'.
+ * Exported for unit tests; not part of the public input API.
+ */
+export function toRobotjsModifier(name: string): string {
+  switch (name) {
+    case 'ctrl':
+      return 'control'
+    case 'meta':
+      return 'command'
+    default:
+      return name
+  }
+}
+
 /** Convert robotjs modifier + key into a single chord string. robotjs.keyTap accepts them as separate args. */
 function robotjsModifierArgs(modifiers: readonly Modifier[]): readonly string[] | undefined {
   if (modifiers.length === 0) return undefined
-  return modifiers
+  return modifiers.map(toRobotjsModifier)
 }
 
 export async function keyTap(
@@ -78,7 +93,9 @@ export async function keyTap(
   if (modArg === undefined) {
     robotjs.keyTap(key)
   } else {
-    robotjs.keyTap(key, modArg as string | string[])
+    // robotjs.keyTap takes each modifier as a separate positional arg
+    // (not an array — passing an array raises "Invalid key flag specified").
+    robotjs.keyTap(key, ...modArg)
   }
 }
 
