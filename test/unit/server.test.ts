@@ -2,7 +2,7 @@
  * Unit tests for src/server.ts MCP entrypoint.
  *
  * Covers:
- *  - factory registration: 12 tools registered under expected names
+ *  - factory registration: 14 tools registered under expected names
  *  - wrapHandlerResult: success path and DaMcpError envelope shape
  *  - transport lifecycle: connect via InMemoryTransport, close cleanly
  *
@@ -41,6 +41,8 @@ const EXPECTED_NAMES = [
   'da_screenshot',
   'da_ocr',
   'da_list_displays',
+  'da_window_list',
+  'da_window_focus',
   'da_get_mouse_position',
   'da_move_mouse',
   'da_click',
@@ -58,7 +60,7 @@ describe('createMcpServer', () => {
     expect(server).toBeInstanceOf(McpServer)
   })
 
-  it('registers all 12 da_* tools with the SDK', () => {
+  it('registers all 14 da_* tools with the SDK', () => {
     const server = createMcpServer()
     const registered = (server as unknown as {
       _registeredTools: Record<string, unknown>
@@ -83,7 +85,7 @@ describe('createMcpServer', () => {
       _registeredTools: Record<string, unknown>
     })._registeredTools
     expect(Object.keys(registered).length).toBe(ALL_TOOLS.length)
-    expect(ALL_TOOLS.length).toBe(12)
+    expect(ALL_TOOLS.length).toBe(14)
   })
 
   it('per-call factory creates independent instances', () => {
@@ -222,7 +224,7 @@ describe('transport lifecycle', () => {
     const bReg = (b as unknown as { _registeredTools: Record<string, unknown> })._registeredTools
     // Mutating one should not be visible on the other (separate objects).
     expect(aReg).not.toBe(bReg)
-    expect(Object.keys(aReg).length).toBe(12)
-    expect(Object.keys(bReg).length).toBe(12)
+    expect(Object.keys(aReg).length).toBe(14)
+    expect(Object.keys(bReg).length).toBe(14)
   })
 })

@@ -53,8 +53,8 @@ For a guided setup, continue below.
 
 | OS | Tooling | Native build deps |
 |---|---|---|
-| Linux (X11) | `xdotool`, `x11-utils`, `tesseract-ocr` | None — all native deps ship prebuilt (`node-screenshots` NAPI, `@nut-tree-fork/nut-js` libnut) |
-| Linux (Wayland) | `ydotool` (daemon), `wtype`, `grim`, `tesseract-ocr` | None |
+| Linux (X11) | `xdotool`, `wmctrl`, `x11-utils`, `tesseract-ocr` | None — all native deps ship prebuilt (`node-screenshots` NAPI, `@nut-tree-fork/nut-js` libnut) |
+| Linux (Wayland) | `ydotool` (daemon), `wtype`, `wmctrl` (XWayland), `grim`, `tesseract-ocr` | None |
 | macOS | `tesseract` (Homebrew), Xcode CLT | None — Xcode CLT only needed for Homebrew itself |
 | Windows | `tesseract` | None — all native deps ship prebuilt; .NET 4.5+ (for PowerShell BitBlt) |
 
@@ -540,6 +540,7 @@ The CLI tool isn't installed or isn't on `$PATH`.
 | `xdotool` | `which xdotool` (Linux X11) |
 | `ydotool` | `which ydotool` and `systemctl status ydotoold` (Wayland) |
 | `wtype` | `which wtype` (Wayland keyboard fallback) |
+| `wmctrl` | `which wmctrl` (Linux — required for `da_window_list` / `da_window_focus`) |
 | `nut.js` (macOS / Windows) | `node -e "require('@nut-tree-fork/nut-js')"` — should print without throwing |
 
 ### `OCR_FAILED`

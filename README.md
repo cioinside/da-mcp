@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 
 ## Features
 
-12 tools registered under the `da_*` namespace:
+14 tools registered under the `da_*` namespace:
 
 ### Capture
 - **`da_screenshot`** — Capture full screen or a specific display as PNG.
@@ -25,6 +25,10 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 
 ### Launch
 - **`da_launch`** — Launch a program by name or path; returns a spawn handle with PID + POSIX signal exit codes (SIGINT=130, SIGTERM=143, SIGHUP=129, SIGKILL=137, SIGQUIT=131, SIGABRT=134).
+
+### Window
+- **`da_window_list`** — Enumerate all visible top-level windows (hwnd/pid/title/bounds/visibility). Cross-platform: `wmctrl` (Linux X11 + Wayland via XWayland), `osascript` + System Events (macOS), PowerShell + `user32!EnumWindows` (Windows).
+- **`da_window_focus`** — Bring a window to the foreground by `hwnd`, `pid`, or title match (`exact` / `regex` / `substring`, case-insensitive). Title matching uses pure-JS resolver; multi-window Paint-style flows return a `NOT_FOUND` error when nothing matches.
 
 ### UI element classification (OCR post-processing)
 
@@ -51,8 +55,9 @@ The `da_ocr` classifier tags each detected text region with one of:
   - **Input** — `src/input/{routing,mouse,keyboard,scroll,drag,types,index}.ts`. Shared routing helpers (`runCli`, `resolveRouting`, `requireTool`, `isMockMode`, `validateCoords`, `Routing`) in `routing.ts`; per-input-type operations in dedicated files. macOS/Windows path uses `@nut-tree-fork/nut-js` (libnut), statically imported.
   - **Launch** — `src/launch/{launch,types}.ts`. `open(1)` + `child_process.spawn` (shell:false); `SIGNAL_EXIT_CODES` map for POSIX signal mapping.
   - **Platform** — `src/platform/{detect,types}.ts`. `detectPlatform()` returns `{ os, display, tools, home }`; `assertPlatformSupported()` throws `PLATFORM_INIT_FAILED` on unsupported combos.
-  - **Server** — `src/server.ts`. Registers 12 tools, wraps handler results into `CallToolResult` with `structuredContent` (Buffers stripped to `number[]` for JSON-safety), installs SIGINT/SIGTERM shutdown.
-  - **Server instructions** — `src/server-instructions.ts`. Exports `SERVER_INSTRUCTIONS`, a string surfaced to the AI agent via the MCP `instructions` field (MCP spec, `ServerOptions.instructions`). Tells the agent it IS the orchestrator — call the 12 `da_*` tools directly through the MCP client, do NOT write an orchestrator script that imports/spawns the server. Edit this string to update the agent-facing announcement.
+  - **Server** — `src/server.ts`. Registers 14 tools, wraps handler results into `CallToolResult` with `structuredContent` (Buffers stripped to `number[]` for JSON-safety), installs SIGINT/SIGTERM shutdown.
+  - **Server instructions** — `src/server-instructions.ts`. Exports `SERVER_INSTRUCTIONS`, a string surfaced to the AI agent via the MCP `instructions` field (MCP spec, `ServerOptions.instructions`). Tells the agent it IS the orchestrator — call the 14 `da_*` tools directly through the MCP client, do NOT write an orchestrator script that imports/spawns the server. Edit this string to update the agent-facing announcement.
+  - **Window** — `src/window/{types,list,list-linux,list-macos,list-windows,focus,resolve,index}.ts`. Per-OS list backends (wmctrl / osascript / PowerShell+EnumWindows) keep each file under the 250 LOC ceiling; pure-JS `matchOne` resolver in `resolve.ts` for title matching.
 
 ### Backend dispatch
 
@@ -66,6 +71,9 @@ The `da_ocr` classifier tags each detected text region with one of:
 | Input (Linux Wayland) | `ydotool` CLI | `wtype` (keyboard only) | — |
 | Input (macOS / Windows) | `@nut-tree-fork/nut-js` (libnut, ships prebuilt binaries) | — | — |
 | OCR (any OS) | `tesseract` CLI | `tesseract.js@7` WASM | — |
+| Window list + focus (Linux) | `wmctrl` CLI (X11 + XWayland on Wayland) | — | — |
+| Window list + focus (macOS) | `osascript` + System Events | — | — |
+| Window list + focus (Windows) | PowerShell + `user32!EnumWindows` / `SetForegroundWindow` | — | — |
 
 Every `spawnSync`/`spawn` call uses `shell:false`. Permission-gated errors (e.g. macOS ScreenCaptureKit, Windows access denied) are detected via a tightened pattern (`screen…permission`, `screencapturekit`, `access is denied`) and re-thrown as `DaMcpError('PERMISSION_DENIED')`.
 
@@ -183,8 +191,8 @@ Open the host firewall for inbound TCP on `DA_MCP_PORT` (default 3000) once per 
 
 | OS | Screenshot | Input | Notes |
 |---|---|---|---|
-| Linux X11 | `node-screenshots` (X11 native) | `xdotool` | x11-server-utils + XCap deps (handled by `install-system-deps.sh`) |
-| Linux Wayland | `node-screenshots` (XCap portal) | `ydotool` (daemon) | XWayland fallback if available |
+| Linux X11 | `node-screenshots` (X11 native) | `xdotool` | `wmctrl` for window list/focus (installed by `install-system-deps.sh`); x11-server-utils + XCap deps (handled by `install-system-deps.sh`) |
+| Linux Wayland | `node-screenshots` (XCap portal) | `ydotool` (daemon) | `wmctrl` works via XWayland if XWayland apps are present |
 | macOS | `node-screenshots` (CG) | `@nut-tree-fork/nut-js` (CGEvent) | First call needs Screen Recording permission (TCC) |
 | Windows | `node-screenshots` (GDI) | `@nut-tree-fork/nut-js` (SendInput) | PowerShell BitBlt fallback if GDI fails |
 
@@ -206,8 +214,8 @@ npx vitest
 
 ### Test inventory
 
-- **18 test files**: 15 unit (`test/unit/`) + 3 e2e (`test/e2e/`)
-- **286 tests passing / 18 skipped** in mock mode (e2e require real X11/tesseract)
+- **20 test files**: 18 unit (`test/unit/`) + 2 e2e (`test/e2e/`)
+- **322 tests passing / 18 skipped** in mock mode (e2e require real X11/tesseract)
 - **Test runtime**: `process.env['DA_MCP_TEST_MODE'] === 'mock'` short-circuits native calls; `_mock.ts` modules inject deterministic native modules
 
 ### Conventions

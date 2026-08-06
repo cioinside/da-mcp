@@ -28,6 +28,7 @@ export type ErrorCode =
   | 'PLATFORM_INIT_FAILED'     // detectPlatform() threw
   | 'INVALID_ARGUMENT'         // schema validation failed (rare; Zod catches most)
   | 'INTERNAL'                 // unexpected — should not happen
+  | 'NOT_FOUND'                // query returned no matching resource (e.g. window title substring matched no visible window)
 
 // Stable, human-readable mapping for logs and MCP error text.
 export const ERROR_CODE_MESSAGES: Readonly<Record<ErrorCode, string>> = {
@@ -45,6 +46,7 @@ export const ERROR_CODE_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   PLATFORM_INIT_FAILED: 'Platform initialization failed',
   INVALID_ARGUMENT: 'Invalid argument',
   INTERNAL: 'Internal server error',
+  NOT_FOUND: 'No matching resource found',
 }
 
 // Single error class used by all modules.

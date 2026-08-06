@@ -25,9 +25,10 @@
  * something an agent might otherwise get wrong.
  */
 export const SERVER_INSTRUCTIONS = [
-  'da-mcp exposes 12 desktop-automation tools over this MCP connection:',
-  'da_screenshot, da_ocr, da_list_displays, da_get_mouse_position, da_move_mouse,',
-  'da_click, da_double_click, da_drag, da_scroll, da_type, da_key, da_launch.',
+  'da-mcp exposes 14 desktop-automation tools over this MCP connection:',
+  'da_screenshot, da_ocr, da_list_displays, da_window_list, da_window_focus,',
+  'da_get_mouse_position, da_move_mouse, da_click, da_double_click, da_drag,',
+  'da_scroll, da_type, da_key, da_launch.',
   'You, the AI agent, ARE the orchestrator. Invoke these tools directly through',
   'your tool-calling interface, one call per logical action. Each tool call',
   'blocks until the action completes and returns its result in-band.',

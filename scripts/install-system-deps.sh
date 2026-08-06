@@ -18,6 +18,7 @@ apt-get install -y -qq \
   xdotool \
   ydotool \
   wtype \
+  wmctrl \
   scrot \
   maim \
   grim \

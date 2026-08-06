@@ -12,6 +12,8 @@
 import { daScreenshot } from './screenshot.js'
 import { daOcr } from './ocr.js'
 import { daListDisplays } from './list-displays.js'
+import { daWindowList } from './window-list.js'
+import { daWindowFocus } from './window-focus.js'
 import { daGetMousePosition } from './get-mouse-position.js'
 import { daMoveMouse } from './move-mouse.js'
 import { daClick } from './click.js'
@@ -29,6 +31,8 @@ export const ALL_TOOLS: readonly McpToolDefinition[] = [
   daScreenshot,
   daOcr,
   daListDisplays,
+  daWindowList,
+  daWindowFocus,
   daGetMousePosition,
   daMoveMouse,
   daClick,
@@ -44,6 +48,8 @@ export {
   daScreenshot,
   daOcr,
   daListDisplays,
+  daWindowList,
+  daWindowFocus,
   daGetMousePosition,
   daMoveMouse,
   daClick,
