@@ -6,10 +6,16 @@ name: Release
 #   curl -L https://github.com/cioinside/da-mcp/releases/latest/download/da-mcp-win32-x64.exe -o da-mcp.exe
 #   da-mcp.exe
 #
-# To release additional targets, pass the comma-separated `enabled_targets`
-# input via workflow_dispatch, e.g. `win32-x64,linux-x64`. Each matrix entry
-# is gated by `contains(env.ENABLED_TARGETS, matrix.target)` so jobs only run
-# when explicitly requested.
+# Trigger paths:
+# - Tag push (v*): builds win32-x64 only (the v1.0.0 contract).
+# - workflow_dispatch with `enabled_targets` input (e.g. "win32-x64,linux-x64"):
+#   builds the specified targets. Each per-target job gates on its own
+#   substring check; jobs not listed in the input skip themselves.
+#
+# Each job shells out to scripts/build-sea.sh $TARGET which produces a
+# dist-sea/$TARGET/da-mcp-$TARGET* artifact uploaded via actions/upload-artifact.
+# The release job then downloads all artifacts and attaches them to the
+# GitHub release via softprops/action-gh-release.
 
 on:
   push:
@@ -21,9 +27,6 @@ on:
         description: 'Comma-separated list of build targets (default: win32-x64)'
         default: 'win32-x64'
         required: false
-
-env:
-  ENABLED_TARGETS: ${{ github.event.inputs.enabled_targets || 'win32-x64' }}
 
 jobs:
   test:
@@ -39,25 +42,11 @@ jobs:
       - run: npm run build
       - run: DA_MCP_TEST_MODE=mock npm test
 
-  build:
-    name: Build ${{ matrix.target }} (${{ matrix.os }})
+  build-win32-x64:
+    name: Build win32-x64 (Windows)
+    runs-on: windows-latest
     needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: win32-x64
-            os: windows-latest
-          - target: linux-x64
-            os: ubuntu-22.04
-          - target: linux-arm64
-            os: ubuntu-22.04-arm
-          - target: darwin-x64
-            os: macos-14
-          - target: darwin-arm64
-            os: macos-14
-    runs-on: ${{ matrix.os }}
-    if: ${{ github.event_name == 'workflow_dispatch' || matrix.target == 'win32-x64' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || contains(github.event.inputs.enabled_targets, 'win32-x64') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,19 +55,111 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
-      - name: SEA build for ${{ matrix.target }}
-        run: bash scripts/build-sea.sh ${{ matrix.target }}
-      - name: Upload ${{ matrix.target }} binary
+      - name: SEA build for win32-x64
+        run: bash scripts/build-sea.sh win32-x64
+      - name: Upload win32-x64 binary
         uses: actions/upload-artifact@v4
         with:
-          name: da-mcp-${{ matrix.target }}
-          path: dist-sea/${{ matrix.target }}/da-mcp-${{ matrix.target }}*
+          name: da-mcp-win32-x64
+          path: dist-sea/win32-x64/da-mcp-win32-x64*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-linux-x64:
+    name: Build linux-x64
+    runs-on: ubuntu-22.04
+    needs: test
+    if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'linux-x64') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: SEA build for linux-x64
+        run: bash scripts/build-sea.sh linux-x64
+      - name: Upload linux-x64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: da-mcp-linux-x64
+          path: dist-sea/linux-x64/da-mcp-linux-x64*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-linux-arm64:
+    name: Build linux-arm64
+    runs-on: ubuntu-22.04-arm
+    needs: test
+    if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'linux-arm64') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: SEA build for linux-arm64
+        run: bash scripts/build-sea.sh linux-arm64
+      - name: Upload linux-arm64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: da-mcp-linux-arm64
+          path: dist-sea/linux-arm64/da-mcp-linux-arm64*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-darwin-x64:
+    name: Build darwin-x64
+    runs-on: macos-14
+    needs: test
+    if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'darwin-x64') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: SEA build for darwin-x64
+        run: bash scripts/build-sea.sh darwin-x64
+      - name: Upload darwin-x64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: da-mcp-darwin-x64
+          path: dist-sea/darwin-x64/da-mcp-darwin-x64*
+          if-no-files-found: error
+          retention-days: 14
+
+  build-darwin-arm64:
+    name: Build darwin-arm64
+    runs-on: macos-14
+    needs: test
+    if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'darwin-arm64') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: SEA build for darwin-arm64
+        run: bash scripts/build-sea.sh darwin-arm64
+      - name: Upload darwin-arm64 binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: da-mcp-darwin-arm64
+          path: dist-sea/darwin-arm64/da-mcp-darwin-arm64*
           if-no-files-found: error
           retention-days: 14
 
   release:
     name: Attach binaries to GitHub release
-    needs: build
+    needs: [build-win32-x64, build-linux-x64, build-linux-arm64, build-darwin-x64, build-darwin-arm64]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
