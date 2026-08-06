@@ -98,13 +98,17 @@ describe('isShellSafe', () => {
 describe('msysToWindowsPath', () => {
   it('converts MSYS-style POSIX path to Windows-native path (issue #5)', () => {
     // Git for Windows' `which` emits paths like '/c/Windows/System32/notepad.exe'.
-    expect(msysToWindowsPath('/c/Windows/System32/notepad.exe')).toBe(
-      'C:\\Windows\\System32\\notepad.exe',
-    )
+    if (process.platform === 'win32') {
+      expect(msysToWindowsPath('/c/Windows/System32/notepad.exe')).toBe(
+        'C:\\Windows\\System32\\notepad.exe',
+      )
+    }
   })
 
   it('uppercases the drive letter', () => {
-    expect(msysToWindowsPath('/d/Users/foo/bar.exe')).toBe('D:\\Users\\foo\\bar.exe')
+    if (process.platform === 'win32') {
+      expect(msysToWindowsPath('/d/Users/foo/bar.exe')).toBe('D:\\Users\\foo\\bar.exe')
+    }
   })
 
   it('is a no-op on real POSIX paths (no <drive-letter>/ suffix)', () => {
