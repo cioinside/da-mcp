@@ -114,7 +114,7 @@ DA_MCP_TEST_MODE=mock npm test
 
 ### stdio (default)
 
-The server speaks MCP over stdio. Configure your MCP client to launch `node /projects/da-mcp/dist/server.js` (or `npx tsx src/server.ts` for dev).
+The server speaks MCP over stdio. Configure your MCP client to launch `node /projects/da-mcp/dist/server-dispatch.js` (or `npx tsx src/server-dispatch.ts` for dev).
 
 ### HTTP (opt-in, token-protected)
 
@@ -169,7 +169,7 @@ Open the host firewall for inbound TCP on `DA_MCP_PORT` (default 3000) once per 
   "mcpServers": {
     "da-mcp": {
       "command": "node",
-      "args": ["/projects/da-mcp/dist/server.js"],
+      "args": ["/projects/da-mcp/dist/server-dispatch.js"],
       "env": {
         "DISPLAY": ":0",
         "DA_MCP_LOG": "info"

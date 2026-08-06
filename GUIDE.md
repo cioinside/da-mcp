@@ -31,10 +31,10 @@ git clone <repo-url> da-mcp     # or: copy the project directory
 cd da-mcp
 npm install                    # compiles robotjs from source
 npm run build                  # tsc → dist/
-DA_MCP_TEST_MODE=mock npm test # 216 passed | 17 skipped expected
+DA_MCP_TEST_MODE=mock npm test # 286 passed | 18 skipped expected
 ```
 
-Then point your MCP client at `node /absolute/path/to/da-mcp/dist/server.js` and you're done.
+Then point your MCP client at `node /absolute/path/to/da-mcp/dist/server-dispatch.js` and you're done.
 
 For a guided setup, continue below.
 
@@ -302,7 +302,7 @@ $bmp.Save("$env:TEMP\test.png")
 
 ## Configure your MCP client
 
-The server speaks MCP over stdio. Every client launches it the same way: spawn `node` with the absolute path to `dist/server.js`. Replace `/absolute/path/to/da-mcp` with the real path.
+The server speaks MCP over stdio. Every client launches it the same way: spawn `node` with the absolute path to `dist/server-dispatch.js`. Replace `/absolute/path/to/da-mcp` with the real path.
 
 ### OpenCode
 
@@ -313,7 +313,7 @@ Edit `~/.config/opencode/config.json` (Linux/macOS) or `%APPDATA%\opencode\confi
   "mcpServers": {
     "da-mcp": {
       "command": "node",
-      "args": ["/absolute/path/to/da-mcp/dist/server.js"],
+      "args": ["/absolute/path/to/da-mcp/dist/server-dispatch.js"],
       "env": {
         "DISPLAY": ":0",
         "DA_MCP_LOG": "info"
@@ -336,7 +336,7 @@ Edit `~/.config/opencode/config.json` (Linux/macOS) or `%APPDATA%\opencode\confi
   "mcpServers": {
     "da-mcp": {
       "command": "node",
-      "args": ["/absolute/path/to/da-mcp/dist/server.js"]
+      "args": ["/absolute/path/to/da-mcp/dist/server-dispatch.js"]
     }
   }
 }
@@ -351,7 +351,7 @@ Edit `~/.cursor/mcp.json`:
   "mcpServers": {
     "da-mcp": {
       "command": "node",
-      "args": ["/absolute/path/to/da-mcp/dist/server.js"]
+      "args": ["/absolute/path/to/da-mcp/dist/server-dispatch.js"]
     }
   }
 }
@@ -384,7 +384,7 @@ By default the server speaks MCP over stdio. For scenarios where stdio is inconv
 ### Enable it
 
 ```bash
-DA_MCP_TRANSPORT=http node /absolute/path/to/da-mcp/dist/server.js
+DA_MCP_TRANSPORT=http node /absolute/path/to/da-mcp/dist/server-dispatch.js
 ```
 
 On first start the server generates a token, persists it to disk with mode `0o600` (owner-only), and prints the full URL:
@@ -404,7 +404,7 @@ Token storage location:
 ### Rotate the token
 
 ```bash
-node /absolute/path/to/da-mcp/dist/server.js token regenerate
+node /absolute/path/to/da-mcp/dist/server-dispatch.js token regenerate
 # → http://127.0.0.1:3000/<new-token>
 ```
 
@@ -462,7 +462,7 @@ Expected: `216 passed | 17 skipped (env) | 0 failed`. The 17 skipped are e2e tes
 Start the server in a foreground terminal:
 
 ```bash
-node /absolute/path/to/da-mcp/dist/server.js
+node /absolute/path/to/da-mcp/dist/server-dispatch.js
 ```
 
 It should print nothing to **stdout** (reserved for MCP). Set `DA_MCP_LOG=debug` to see startup logs on **stderr**:
@@ -583,7 +583,7 @@ A child process couldn't be started. The error includes the missing binary name.
 All logs go to **stderr**, not stdout (stdout is reserved for MCP framing). To see logs:
 
 ```bash
-DA_MCP_LOG=debug node dist/server.js 2>server.log
+DA_MCP_LOG=debug node dist/server-dispatch.js 2>server.log
 tail -f server.log
 ```
 

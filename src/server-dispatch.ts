@@ -1,12 +1,12 @@
 /**
- * CLI dispatch for the `node dist/server.js` entry point.
+ * CLI dispatch for the `node dist/server-dispatch.js` entry point.
  *
  * Lives outside server.ts to keep that module focused on stdio MCP
  * server creation (and under the 250 LOC ceiling). Handles:
  *
- *   - `node dist/server.js`              → stdio (default)
- *   - `node dist/server.js token regenerate`  → prints HTTP URL
- *   - `node dist/server.js token generate`    → alias of `regenerate`
+ *   - `node dist/server-dispatch.js`              → stdio (default)
+ *   - `node dist/server-dispatch.js token regenerate`  → prints HTTP URL
+ *   - `node dist/server-dispatch.js token generate`    → alias of `regenerate`
  *   - anything else with `token` as argv[2]  → usage on stderr, exit 2
  */
 import {
@@ -34,7 +34,7 @@ export function runCli(argv: readonly string[]): Promise<void> {
     return runTokenRegenerate()
   }
   if (argv[2] === 'token') {
-    process.stderr.write('usage: node dist/server.js token regenerate\n')
+    process.stderr.write('usage: node dist/server-dispatch.js token regenerate\n')
     process.exit(2)
   }
   return runWithTransport()

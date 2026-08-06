@@ -3,7 +3,7 @@
  *
  * Registers the 12 da_* tools with the @modelcontextprotocol/server SDK and
  * serves them over stdio. Owns config bootstrap, stderr logging, and graceful
- * SIGINT/SIGTERM shutdown. Run via `node dist/server.js` or `npm start`.
+ * SIGINT/SIGTERM shutdown. Run via `node dist/server-dispatch.js` or `npm start`.
  */
 import {
   McpServer,
