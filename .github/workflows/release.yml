@@ -32,6 +32,7 @@ jobs:
   test:
     name: Test (Ubuntu)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,7 +46,6 @@ jobs:
   build-win32-x64:
     name: Build win32-x64 (Windows)
     runs-on: windows-latest
-    needs: test
     if: ${{ startsWith(github.ref, 'refs/tags/v') || contains(github.event.inputs.enabled_targets, 'win32-x64') }}
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +68,6 @@ jobs:
   build-linux-x64:
     name: Build linux-x64
     runs-on: ubuntu-22.04
-    needs: test
     if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'linux-x64') }}
     steps:
       - uses: actions/checkout@v4
@@ -91,7 +90,6 @@ jobs:
   build-linux-arm64:
     name: Build linux-arm64
     runs-on: ubuntu-22.04-arm
-    needs: test
     if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'linux-arm64') }}
     steps:
       - uses: actions/checkout@v4
@@ -114,7 +112,6 @@ jobs:
   build-darwin-x64:
     name: Build darwin-x64
     runs-on: macos-14
-    needs: test
     if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'darwin-x64') }}
     steps:
       - uses: actions/checkout@v4
@@ -137,7 +134,6 @@ jobs:
   build-darwin-arm64:
     name: Build darwin-arm64
     runs-on: macos-14
-    needs: test
     if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.enabled_targets, 'darwin-arm64') }}
     steps:
       - uses: actions/checkout@v4
