@@ -109,10 +109,31 @@ export function requireTool(
   }
 }
 
-/** Lazy-load the robotjs native module. Throws NATIVE_MISSING on MODULE_NOT_FOUND. */
+/**
+ * Lazy-load the robotjs native module. Throws NATIVE_MISSING on MODULE_NOT_FOUND.
+ *
+ * Note on the `.default` unwrap:
+ *   This package's `package.json` declares `"type": "module"` (ESM), but robotjs
+ *   is a plain CJS module (`module.exports = nativeBinding`). When ESM code
+ *   dynamically imports a CJS module via `await import('robotjs')`, Node
+ *   returns the namespace `{ default: module.exports, ...staticNamedExports }`.
+ *   `cjs-module-lexer` cannot statically enumerate exports from the
+ *   `module.exports = nativeBinding` shape, so every callable (`typeString`,
+ *   `keyTap`, `mouseClick`, `getMousePos`, `screen.capture`, etc.) lives only
+ *   on `.default`. If we returned the raw namespace, every downstream
+ *   `robotjs.X()` call would dispatch on `undefined` and throw
+ *   `robotjs.X is not a function`.
+ *
+ *   We unwrap `.default` here so the rest of the input subsystem can keep
+ *   calling `robotjs.keyTap(...)`, `robotjs.mouseClick(...)`, etc. as before.
+ *   The `?? m` fallback keeps us forward-compatible if robotjs ever ships as
+ *   a real ESM module (in which case the named exports would appear at the
+ *   top level).
+ */
 export async function loadRobotjs(): Promise<typeof import('robotjs')> {
   try {
-    return await import('robotjs')
+    const m = await import('robotjs')
+    return ((m as { default?: typeof import('robotjs') }).default ?? m) as typeof import('robotjs')
   } catch (e) {
     if (e instanceof Error && 'code' in e && (e as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') {
       throw new DaMcpError('NATIVE_MISSING', 'robotjs native module not installed', e)
