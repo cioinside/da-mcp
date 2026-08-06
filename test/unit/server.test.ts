@@ -46,8 +46,10 @@ const EXPECTED_NAMES = [
   'da_get_mouse_position',
   'da_move_mouse',
   'da_click',
+  'da_click_text',
   'da_double_click',
   'da_drag',
+  'da_draw_path',
   'da_scroll',
   'da_type',
   'da_key',
@@ -60,7 +62,7 @@ describe('createMcpServer', () => {
     expect(server).toBeInstanceOf(McpServer)
   })
 
-  it('registers all 14 da_* tools with the SDK', () => {
+  it('registers all 16 da_* tools with the SDK', () => {
     const server = createMcpServer()
     const registered = (server as unknown as {
       _registeredTools: Record<string, unknown>
@@ -85,7 +87,7 @@ describe('createMcpServer', () => {
       _registeredTools: Record<string, unknown>
     })._registeredTools
     expect(Object.keys(registered).length).toBe(ALL_TOOLS.length)
-    expect(ALL_TOOLS.length).toBe(14)
+    expect(ALL_TOOLS.length).toBe(16)
   })
 
   it('per-call factory creates independent instances', () => {
@@ -224,7 +226,7 @@ describe('transport lifecycle', () => {
     const bReg = (b as unknown as { _registeredTools: Record<string, unknown> })._registeredTools
     // Mutating one should not be visible on the other (separate objects).
     expect(aReg).not.toBe(bReg)
-    expect(Object.keys(aReg).length).toBe(14)
-    expect(Object.keys(bReg).length).toBe(14)
+    expect(Object.keys(aReg).length).toBe(16)
+    expect(Object.keys(bReg).length).toBe(16)
   })
 })

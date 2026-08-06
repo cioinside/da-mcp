@@ -17,8 +17,10 @@ import { daWindowFocus } from './window-focus.js'
 import { daGetMousePosition } from './get-mouse-position.js'
 import { daMoveMouse } from './move-mouse.js'
 import { daClick } from './click.js'
+import { daClickText } from './click-text.js'
 import { daDoubleClick } from './double-click.js'
 import { daDrag } from './drag.js'
+import { daDrawPath } from './draw-path.js'
 import { daScroll } from './scroll.js'
 import { daType } from './type.js'
 import { daKey } from './key.js'
@@ -36,8 +38,10 @@ export const ALL_TOOLS: readonly McpToolDefinition[] = [
   daGetMousePosition,
   daMoveMouse,
   daClick,
+  daClickText,
   daDoubleClick,
   daDrag,
+  daDrawPath,
   daScroll,
   daType,
   daKey,
@@ -53,8 +57,10 @@ export {
   daGetMousePosition,
   daMoveMouse,
   daClick,
+  daClickText,
   daDoubleClick,
   daDrag,
+  daDrawPath,
   daScroll,
   daType,
   daKey,
