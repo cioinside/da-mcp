@@ -141,6 +141,20 @@ Override defaults with env vars:
 
 The URL is **unauthenticated token** (bearer-style): anyone with the token can call tools. Bind only to `127.0.0.1` (default) — do not expose this to a network without adding an upstream auth proxy.
 
+#### Remote access from another host on the LAN
+
+When `DA_MCP_TRANSPORT=http` is set but `DA_MCP_HTTP_HOST` is left at its default `127.0.0.1`, the server prints a one-line warning at startup. To reach the daemon from another machine:
+
+```bash
+npm run start:lan
+# → sets DA_MCP_TRANSPORT=http + DA_MCP_HTTP_HOST=0.0.0.0, then spawns the server
+# → prints the platform firewall command you need to run, and the token file path
+```
+
+Then on the **remote** machine, configure your MCP client with the full URL `http://<lan-ip>:3000/<token>` from the server's startup log. The token is read from the local file (see table above) — copy it via `node /projects/da-mcp/dist/server-dispatch.js token regenerate`.
+
+The script does NOT auto-open the host firewall: that requires elevation and varies per OS. Run the printed command (e.g. `New-NetFirewallRule -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow` on Windows) once before the first remote connection.
+
 ### OpenCode / Claude Desktop example config
 
 ```jsonc

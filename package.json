@@ -12,6 +12,7 @@
   "main": "./dist/server-dispatch.js",
   "scripts": {
     "start": "tsx src/server-dispatch.ts",
+    "start:lan": "node scripts/start-lan.mjs",
     "dev": "tsx watch src/server-dispatch.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",

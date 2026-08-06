@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { createServer } from 'node:http'
 import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server'
 import type { CallToolResult } from '@modelcontextprotocol/server'
-import { startHttpServer } from '../../src/transport/http.js'
+import { startHttpServer, isLoopbackHost } from '../../src/transport/http.js'
 import { DaMcpError } from '../../src/errors.js'
 
 const TOKEN = 'integration-test-token-abcdef1234567890123456789012'
@@ -173,6 +173,36 @@ describe('startHttpServer', () => {
     if (caught instanceof DaMcpError) {
       expect(caught.code).toBe('PLATFORM_INIT_FAILED')
     }
+  })
+})
+
+describe('isLoopbackHost', () => {
+  it('returns true for 127.0.0.1 (IPv4 loopback)', () => {
+    expect(isLoopbackHost('127.0.0.1')).toBe(true)
+  })
+
+  it('returns true for ::1 (IPv6 loopback)', () => {
+    expect(isLoopbackHost('::1')).toBe(true)
+  })
+
+  it('returns true for "localhost" (hostname that Node resolves to loopback)', () => {
+    expect(isLoopbackHost('localhost')).toBe(true)
+  })
+
+  it('returns false for 0.0.0.0 (all interfaces, the LAN bind address)', () => {
+    expect(isLoopbackHost('0.0.0.0')).toBe(false)
+  })
+
+  it('returns false for a LAN IP', () => {
+    expect(isLoopbackHost('192.168.1.42')).toBe(false)
+  })
+
+  it('returns false for an arbitrary hostname', () => {
+    expect(isLoopbackHost('da-mcp.lan.example.com')).toBe(false)
+  })
+
+  it('is case-sensitive (only lowercase "localhost" matches)', () => {
+    expect(isLoopbackHost('LOCALHOST')).toBe(false)
   })
 })
 

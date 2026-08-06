@@ -6,4 +6,5 @@ export {
   startHttpServer,
   type HttpServerHandle,
   type HttpServerOptions,
+  isLoopbackHost,
 } from './http.js'

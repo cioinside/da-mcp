@@ -36,6 +36,26 @@ export interface HttpServerHandle {
   close: () => Promise<void>
 }
 
+/**
+ * Hosts that bind only the local machine. `localhost` is included because
+ * Node resolves it to a loopback address on every supported platform; we
+ * compare strings rather than doing DNS resolution so the check is fast and
+ * offline-safe.
+ */
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
+  '127.0.0.1',
+  '::1',
+  'localhost',
+])
+
+export function isLoopbackHost(host: string): boolean {
+  return LOOPBACK_HOSTS.has(host)
+}
+
+const LOOPBACK_HINT =
+  'da-mcp: bound to loopback — remote clients on the LAN cannot reach this. ' +
+  'Set DA_MCP_HTTP_HOST=0.0.0.0 to listen on all interfaces, or run `npm run start:lan`.'
+
 function unauthorized(res: ServerResponse): void {
   res.statusCode = 401
   res.setHeader('content-type', 'application/json')
@@ -103,6 +123,9 @@ export async function startHttpServer(opts: HttpServerOptions): Promise<HttpServ
     server.once('error', onError)
     server.listen(opts.port, opts.host, () => {
       server.removeListener('error', onError)
+      if (isLoopbackHost(opts.host)) {
+        process.stderr.write(`${LOOPBACK_HINT} (bound: ${opts.host})\n`)
+      }
       const addr = server.address()
       const boundPort = typeof addr === 'object' && addr !== null ? addr.port : opts.port
       const boundHost = typeof addr === 'object' && addr !== null ? addr.address : opts.host
