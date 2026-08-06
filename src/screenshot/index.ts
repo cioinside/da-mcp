@@ -1,12 +1,12 @@
 /**
  * Screenshot public API + dispatcher.
  *
- * `captureScreenshot` walks backends in priority order — node-screenshots,
- * then screenshot-desktop, then the OS-specific CLI fallback (scrot / grim /
- * screencapture, or PowerShell BitBlt on Windows). Errors that signal "no
- * further backend will help" propagate immediately (DISPLAY_NOT_FOUND,
- * UNSUPPORTED_PLATFORM, PLATFORM_INIT_FAILED, PERMISSION_DENIED). Everything
- * else falls through to the next backend.
+ * `captureScreenshot` walks backends in priority order — screenshot-desktop,
+ * then the OS-specific CLI fallback (scrot / grim / screencapture, or
+ * PowerShell BitBlt on Windows). Errors that signal "no further backend will
+ * help" propagate immediately (DISPLAY_NOT_FOUND, UNSUPPORTED_PLATFORM,
+ * PLATFORM_INIT_FAILED, PERMISSION_DENIED). Everything else falls through to
+ * the next backend.
  *
  * Mock mode short-circuits the whole chain with the deterministic fixture
  * declared in `./png.ts`.
@@ -19,7 +19,6 @@ import {
 } from '../platform/detect.js'
 import type { DisplayInfo, DisplayServerId, OsId } from '../platform/types.js'
 import {
-  nodeScreenshotsBackend,
   runCliCapture,
   screenshotDesktopBackend,
   windowsCliBackend,
@@ -38,11 +37,6 @@ export type { ScreenshotOptions, ScreenshotResult, ScreenshotSource }
 
 /** Re-exports for backwards compatibility (tests + tools import these names). */
 export { checkPngMagic, isMockMode, validatePngBuffer }
-
-function clampRotation(r: number): 0 | 90 | 180 | 270 {
-  if (r === 90 || r === 180 || r === 270) return r
-  return 0
-}
 
 async function findDisplay(displayId: number): Promise<DisplayInfo> {
   const displays = await listDisplays()
@@ -101,21 +95,14 @@ async function dispatchCapture(
     await findDisplay(displayId)
   }
 
-  // Tier 1: node-screenshots.
-  try {
-    return await nodeScreenshotsBackend(displayId)
-  } catch (err) {
-    if (isTerminal(err)) throw err
-  }
-
-  // Tier 2: screenshot-desktop.
+  // Tier 1: screenshot-desktop.
   try {
     return await screenshotDesktopBackend(displayId)
   } catch (err) {
     if (isTerminal(err)) throw err
   }
 
-  // Tier 3: OS-specific CLI fallback.
+  // Tier 2: OS-specific CLI fallback.
   const info = detectPlatform()
   if (info.os === 'win32') {
     return await windowsCliBackend()
@@ -187,29 +174,10 @@ export async function listDisplays(): Promise<DisplayInfo[]> {
   if (isMockMode()) return [MOCK_DISPLAY]
   const info = detectPlatform()
   assertPlatformSupported(info)
-  const ns = await import('node-screenshots').catch(() => null)
-  if (ns === null) {
-    throw new DaMcpError('NATIVE_MISSING', 'node-screenshots unavailable')
-  }
-  let monitors: ReadonlyArray<import('node-screenshots').Monitor>
-  try {
-    monitors = ns.Monitor.all()
-  } catch (err) {
-    throw new DaMcpError('NATIVE_FAILED', 'node-screenshots Monitor.all() failed', err)
-  }
-  return monitors.map((m) => {
-    const out: DisplayInfo = {
-      id: m.id(),
-      name: m.name(),
-      isPrimary: m.isPrimary(),
-      bounds: { x: m.x(), y: m.y(), width: m.width(), height: m.height() },
-      scaleFactor: m.scaleFactor(),
-      rotation: clampRotation(m.rotation()),
-    }
-    const freq = m.frequency()
-    if (freq > 0) out.refreshRateHz = freq
-    return out
-  })
+  throw new DaMcpError(
+    'NATIVE_MISSING',
+    `Display enumeration backend not available in this build (os=${info.os} display=${info.display}). Use da_window_list for window enumeration.`,
+  )
 }
 
 // Suppress an unused-import lint when checkPngMagic is only re-exported.

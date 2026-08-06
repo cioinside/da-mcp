@@ -27,7 +27,6 @@
   "dependencies": {
     "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
-    "node-screenshots": "0.2.8",
     "open": "11.0.0",
     "@nut-tree-fork/nut-js": "4.2.6",
     "screenshot-desktop": "1.15.4",

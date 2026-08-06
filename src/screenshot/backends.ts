@@ -131,63 +131,6 @@ export function runCliCapture(opts: CliOpts): Promise<Buffer> {
   })
 }
 
-/** Try to dynamically import node-screenshots; return null on failure. */
-async function loadNodeScreenshots(): Promise<typeof import('node-screenshots') | null> {
-  try {
-    return await import('node-screenshots')
-  } catch {
-    return null
-  }
-}
-
-/** Primary backend: node-screenshots (X11/Wayland/CG/GDI via NAPI-RS). */
-export async function nodeScreenshotsBackend(
-  displayId: number | null,
-): Promise<CaptureBlob> {
-  const ns = await loadNodeScreenshots()
-  if (ns === null) {
-    throw new DaMcpError('NATIVE_MISSING', 'node-screenshots unavailable')
-  }
-  let monitors: ReadonlyArray<import('node-screenshots').Monitor>
-  try {
-    monitors = ns.Monitor.all()
-  } catch (err) {
-    permissionErrorFor(err, 'node-screenshots Monitor.all')
-    throw new DaMcpError('NATIVE_FAILED', 'node-screenshots Monitor.all() failed', err)
-  }
-  if (monitors.length === 0) {
-    throw new DaMcpError('NATIVE_FAILED', 'node-screenshots returned no monitors')
-  }
-  const firstMonitor = monitors[0]
-  if (firstMonitor === undefined) {
-    throw new DaMcpError('NATIVE_FAILED', 'node-screenshots returned no monitors')
-  }
-  const monitor =
-    displayId !== null
-      ? monitors.find((m) => m.id() === displayId)
-      : (monitors.find((m) => m.isPrimary()) ?? firstMonitor)
-  if (!monitor) {
-    throw new DaMcpError(
-      'DISPLAY_NOT_FOUND',
-      `No node-screenshots monitor with id=${String(displayId)}`,
-    )
-  }
-  let image: import('node-screenshots').Image
-  try {
-    image = await monitor.captureImage()
-  } catch (err) {
-    permissionErrorFor(err, 'node-screenshots captureImage')
-    throw new DaMcpError('NATIVE_FAILED', 'node-screenshots captureImage() failed', err)
-  }
-  const buffer = await image.toPng()
-  return {
-    buffer,
-    source: 'node-screenshots',
-    widthPx: image.width,
-    heightPx: image.height,
-  }
-}
-
 /** Secondary backend: screenshot-desktop (cross-platform CJS wrapper). */
 export async function screenshotDesktopBackend(
   displayId: number | null,

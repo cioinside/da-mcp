@@ -6,10 +6,10 @@
  * can serialize it to a base64 image content.
  *
  * BUG HISTORY: previous schema capped displayId at 32767 (Int16 max). Real
- * Windows display IDs from `node-screenshots` are 65537+, so every per-display
- * screenshot call rejected the input as INVALID_ARGUMENT. Raised to Int32 max
- * (2147483647) — comfortably covers the full Int32 range used by Windows GDI
- * for HMONITOR handles.
+ * Windows display IDs from the native capture backend are 65537+, so every
+ * per-display screenshot call rejected the input as INVALID_ARGUMENT. Raised
+ * to Int32 max (2147483647) — comfortably covers the full Int32 range used
+ * by Windows GDI for HMONITOR handles.
  */
 import { z } from 'zod'
 import { defineTool } from './types.js'

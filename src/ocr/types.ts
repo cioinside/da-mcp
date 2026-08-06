@@ -3,7 +3,7 @@
  *
  * The shape of OCRWord matches Tesseract's tsv output (level=5) so this module can
  * map directly from the raw CLI output. BoundingBox values are in image-pixel coords,
- * with (0,0) at top-left — consistent with node-screenshots' captureImage().
+ * with (0,0) at top-left — consistent with the screenshot capture contract.
  */
 
 /** Pixel-space axis-aligned bounding box. */

@@ -2,8 +2,9 @@
  * End-to-end test suite: real X11 screenshot capture + mouse input.
  *
  * Runs ONLY when DA_MCP_TEST_MODE !== 'mock' (skipped otherwise so mock CI runs
- * don't hang on native X11 calls). Uses node-screenshots for capture and xdotool
- * for mouse input — both reach out to the live DISPLAY (default localhost:12.0).
+ * don't hang on native X11 calls). Uses the screenshot CLI fallback for capture
+ * and xdotool for mouse input — both reach out to the live DISPLAY (default
+ * localhost:12.0).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 

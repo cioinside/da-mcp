@@ -19,7 +19,6 @@ export interface ScreenshotOptions {
 }
 
 export type ScreenshotSource =
-  | 'node-screenshots'
   | 'screenshot-desktop'
   | 'cli-scrot'
   | 'cli-grim'
