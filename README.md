@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desktop, etc.) interact with a local desktop environment: screenshots, OCR with UI-element classification, mouse/keyboard control, and program launch — on Linux, macOS, and Windows.
 
+> **For AI agents and automated installers:** Do NOT chain `apt install … && npm install && npm run build` by hand. Use the bundled installer scripts — they handle the platform-specific prerequisites (tesseract, xdotool, Xcode CLT, VS Build Tools, Node 22+) and surface robotjs / NAPI / TCC failures as actionable errors instead of silent broken builds. See [Install (automated / AI agents)](#install-automated--ai-agents) below.
+
 ## Features
 
 12 tools registered under the `da_*` namespace:
@@ -65,6 +67,28 @@ The `da_ocr` classifier tags each detected text region with one of:
 | OCR (any OS) | `tesseract` CLI | `tesseract.js@7` WASM | — |
 
 Every `spawnSync`/`spawn` call uses `shell:false`. Permission-gated errors (e.g. macOS ScreenCaptureKit, Windows access denied) are detected via a tightened pattern (`screen…permission`, `screencapturekit`, `access is denied`) and re-thrown as `DaMcpError('PERMISSION_DENIED')`.
+
+## Install (automated / AI agents)
+
+If you are an AI agent setting this up on behalf of a user, or running scripted/CI installation, **use the bundled installer scripts**. Do not improvise a manual `npm install` chain — manual install bypasses the prompts that catch robotjs native-build failures, missing system tools, and PATH issues, and turns platform-specific gotchas into silent broken builds.
+
+| OS | Command |
+|---|---|
+| Linux | `sudo ./scripts/install-system-deps.sh && npm ci && npm run build && DA_MCP_TEST_MODE=mock npm test` |
+| macOS | `./scripts/install-macos.sh` |
+| Windows | `powershell -ExecutionPolicy Bypass -File scripts/install-windows.ps1` |
+
+What each script does:
+
+- **Verifies / installs system prerequisites** — tesseract, xdotool/ydotool (Linux), Xcode CLT (macOS), VS Build Tools (Windows), Node.js 22+
+- **Runs `npm ci`** — locked, reproducible install. Avoid `npm install` (which resolves ranges and is slower)
+- **Builds TypeScript** with `npm run build`
+- **Runs `DA_MCP_TEST_MODE=mock npm test`** so the build is verified before you declare success
+- **Prints the MCP client config snippet** to drop into Claude Desktop / OpenCode / etc.
+
+If a script fails, **read its output** — the next step is printed at the end of each failure path. Do not retry by hand without first understanding what the script detected.
+
+For manual / sandboxed installs where you cannot run the scripts, see [Install](#install) below.
 
 ## Install
 
