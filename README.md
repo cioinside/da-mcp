@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 
 ## Features
 
-14 tools registered under the `da_*` namespace:
+16 tools registered under the `da_*` namespace:
 
 ### Capture
 - **`da_screenshot`** — Capture full screen or a specific display as PNG.
@@ -17,8 +17,10 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 - **`da_get_mouse_position`** — Read current cursor position (X11/Linux uses `xdotool getmouselocation --shell`, Wayland uses `ydotool`, macOS/Windows uses `@nut-tree-fork/nut-js`).
 - **`da_move_mouse`** — Move the cursor to (x, y).
 - **`da_click`** — Click at (x, y) with optional button (left/right/middle/back/forward) and count.
+- **`da_click_text`** — OCR-then-click: find a UI element by visible text (exact or fuzzy) and click its center. Returns `NOT_FOUND` if no match.
 - **`da_double_click`** — Convenience wrapper for double-click.
 - **`da_drag`** — Drag from (x1, y1) to (x2, y2).
+- **`da_draw_path`** — Trace a multi-point mouse path with optional `Modifier[]` held throughout (try/finally guarantees modifier cleanup).
 - **`da_scroll`** — Scroll wheel at (x, y) by (dx, dy).
 - **`da_type`** — Type a string at the current focus.
 - **`da_key`** — Press a single key or chord (e.g. `Ctrl+C`).
@@ -29,6 +31,26 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 ### Window
 - **`da_window_list`** — Enumerate all visible top-level windows (hwnd/pid/title/bounds/visibility). Cross-platform: `wmctrl` (Linux X11 + Wayland via XWayland), `osascript` + System Events (macOS), PowerShell + `user32!EnumWindows` (Windows).
 - **`da_window_focus`** — Bring a window to the foreground by `hwnd`, `pid`, or title match (`exact` / `regex` / `substring`, case-insensitive). Title matching uses pure-JS resolver; multi-window Paint-style flows return a `NOT_FOUND` error when nothing matches.
+
+### Skills (for OpenCode / Claude Desktop agents)
+
+This repo ships a **generic desktop-orchestration skill** that any agent can install to drive the 16 `da_*` tools through a 6-step loop: Orient → Observe → Locate → Act → Verify → Iterate. It is **application-agnostic** — Paint, browsers, IDEs, dialogs, file managers, native apps.
+
+**Source-of-truth location:** [`docs/skills/da-ui-orchestrator.md`](docs/skills/da-ui-orchestrator.md). The file is deliberately kept out of `.opencode/skills/` so that this repo doesn't auto-load as an OpenCode skill on its own — it stays a portable artefact that you copy into your client.
+
+**Install the skill on your machine:**
+
+```bash
+# OpenCode:
+mkdir -p ~/.config/opencode/skills/da-ui-orchestrator
+cp docs/skills/da-ui-orchestrator.md ~/.config/opencode/skills/da-ui-orchestrator/SKILL.md
+
+# Claude Code:
+mkdir -p ~/.agents/skills/da-ui-orchestrator
+cp docs/skills/da-ui-orchestrator.md ~/.agents/skills/da-ui-orchestrator/SKILL.md
+```
+
+Restart your MCP client — `da-ui-orchestrator` will appear in `available_skills`. After `git pull` on this repo, re-copy the file to refresh.
 
 ### UI element classification (OCR post-processing)
 
@@ -117,6 +139,47 @@ npm run typecheck
 # Run all tests (mock mode — skips real native calls)
 DA_MCP_TEST_MODE=mock npm test
 ```
+
+## Upgrading
+
+A single CLI command updates an installed `da-mcp` working tree to the latest committed version on the current branch and rebuilds it:
+
+```bash
+# from inside the repo:
+node /projects/da-mcp/dist/server-dispatch.js upgrade
+# or, equivalently:
+npm run upgrade
+```
+
+`upgrade` performs (only when the working tree is clean):
+
+1. `git fetch origin` + `git reset --hard origin/<current-branch>`
+2. `npm ci` — locked, reproducible dependency install
+3. `npm run build` — TypeScript compile to `dist/`
+4. `npm run typecheck` — strict-mode smoke check
+5. After a successful upgrade, if a `da-mcp` system service is registered (see below), the command restarts it via `systemctl` / `launchctl` / `sc.exe`. Otherwise it prints a one-line reminder to restart your MCP client manually.
+
+The command **refuses** to run when the working tree has uncommitted changes — run `git status` and `git stash` them first. Pass `--force` to override (discards local changes).
+
+### Run `da-mcp` as a system service (auto-restart)
+
+For long-running installations, `da-mcp` registers as a managed service so that `upgrade` can bounce it without manual intervention:
+
+```bash
+# Install (one-shot, needs root / Administrator):
+node /projects/da-mcp/dist/server-dispatch.js install-service
+
+# Uninstall later:
+node /projects/da-mcp/dist/server-dispatch.js uninstall-service
+```
+
+| OS | Service type | Restart command used by `upgrade` |
+|---|---|---|
+| Linux | `da-mcp.service` (systemd, user unit) | `systemctl --user restart da-mcp` |
+| macOS | `com.da-mcp.daemon` (launchd) | `launchctl kickstart -k gui/$(id -u)/com.da-mcp.daemon` |
+| Windows | `da-mcp` (SCM service, runs under LocalSystem) | `sc stop da-mcp && sc start da-mcp` |
+
+Templates live in `scripts/systemd/`, `scripts/launchd/`, and `scripts/windows/`. Service installation requires elevated privileges (sudo / Run as Administrator). The default transport after `install-service` is **HTTP** with token auth (so multiple MCP clients can share one daemon); use `DA_MCP_TRANSPORT=stdio` if you prefer per-client stdio.
 
 ## Run
 
