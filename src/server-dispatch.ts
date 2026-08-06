@@ -17,7 +17,6 @@
  */
 import os from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import {
   runServer,
   runHttpServer,
@@ -38,8 +37,12 @@ function runWithTransport(): Promise<void> {
 }
 
 function resolveProjectRoot(): string {
-  // src/server-dispatch.ts → ../../ = repo root.
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+  // For `node dist/server-dispatch.js` the entry is argv[1] (the script
+  // path); for a Node SEA binary argv[1] equals argv[0] (the binary
+  // itself). dirname + ../../ lands on the repo root in the former case,
+  // and on the binary's grandparent in the latter — only used by
+  // upgrade/install-service, which don't apply to SEA anyway.
+  return path.resolve(path.dirname(process.argv[1] ?? process.execPath), '..', '..')
 }
 
 function stdoutLine(msg: string): void {
@@ -133,7 +136,7 @@ function printUsage(): void {
   )
 }
 
-if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (process.argv[1] !== undefined) {
   runCli(process.argv).catch((err: unknown) => {
     process.stderr.write(`da-mcp fatal: ${String(err)}\n`)
     process.exit(1)

@@ -22,17 +22,21 @@
     "lint": "tsc --noEmit",
     "upgrade": "tsx src/server-dispatch.ts upgrade",
     "install-service": "tsx src/server-dispatch.ts install-service",
-    "uninstall-service": "tsx src/server-dispatch.ts uninstall-service"
+    "uninstall-service": "tsx src/server-dispatch.ts uninstall-service",
+    "sea:build": "bash scripts/build-sea.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
+    "open": "11.0.0",
     "screenshot-desktop": "1.15.4",
     "tesseract.js": "7.0.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "26.1.2",
+    "esbuild": "0.28.1",
+    "postject": "1.0.0-alpha.6",
     "tsx": "4.23.5",
     "typescript": "7.0.2",
     "vitest": "4.1.10"

@@ -12,6 +12,10 @@ tessdata/
 /tmp/da-mcp-*.jsonl
 /tmp/da-mcp-manual-qa/
 
+# Node SEA (Single Executable Application) artifacts
+dist-sea/
+sea-config.json
+
 # Tooling / runtime artifacts (not project source)
 .omo/
 .opencode/
