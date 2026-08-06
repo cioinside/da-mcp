@@ -19,9 +19,48 @@ import { DaMcpError } from '../errors.js'
 import { getConfig } from '../config.js'
 import type { LaunchOpts, SpawnHandle } from './types.js'
 
-// Shell metacharacters that would re-enable injection if any arg contained one.
-// Matches: ; | & > < $ ` \n \r ( ) { } * ? [ ] ~ # ! \ ' "
-const SHELL_METACHARS_REGEX = /[;|&>$`\n\r(){}*?[\]~#!\\'"]/
+// Shell metacharacters that would re-enable injection if any arg contained one
+// when this arg is interpreted by a shell. The launcher always uses
+// `child_process.spawn(cmd, args, { shell: false })` (verified at every
+// `spawn`/`spawnSync` call site in this file) — args are passed directly to
+// CreateProcessW / execve, never via cmd.exe or sh. So the dangerous set is
+// "characters a shell would expand", NOT "characters that might exist in argv".
+// On Windows `\` is the path separator (every absolute Windows path contains
+// at least one), so blocking `\` rejects every Windows executable path and
+// every Windows-path argument. Removed from the set.
+//
+// Matches: ; | & > < $ ` \n \r ( ) { } * ? [ ] ~ # ! ' "
+const SHELL_METACHARS_REGEX = /[;|&>$`\n\r(){}*?[\]~#!'"]/
+
+/** Convert a single MSYS-style POSIX path (`/c/Windows/...`) to a Windows-native
+ *  path (`C:\Windows\...`). Used to normalise the output of Git for Windows'
+ *  `which` command, which emits MSYS paths when Git Bash is on PATH. Node's
+ *  `child_process.spawn` cannot interpret MSYS POSIX paths on Windows.
+ *
+ *  KNOWN LIMITATION: the regex matches any `/<single-letter>/...` pattern, so
+ *  a path like `/usr/bin/git` (where `u` is the first segment) is also matched
+ *  and converted to `U:\sr\bin\git`. In practice this rarely matters because
+ *  Git for Windows' `which` returns paths under `/c/Program Files/Git/...`,
+ *  where the conversion is correct.
+ *
+ *  No-op on non-Windows.
+ *
+ *  Exported for unit tests; not part of the public launch API.
+ */
+export function msysToWindowsPath(p: string): string {
+  if (process.platform !== 'win32') return p
+  if (!p.startsWith('/')) return p
+  const m = /^\/(?<drive>[a-zA-Z])(?<rest>.*)$/.exec(p)
+  if (!m || !m.groups) return p
+  // Non-null assertions are sound: the named groups are part of the regex
+  // pattern, so they are guaranteed to be present when `exec` returns a match.
+  const drive = m.groups['drive']!.toUpperCase()
+  // The regex captures `(?<rest>.*)` after `/<drive>`, so `rest` STILL starts
+  // with `/` (e.g. `/c/Windows/...` -> drive=`c`, rest=`/Windows/...`). Strip
+  // the leading slash first, then convert remaining separators.
+  const rest = m.groups['rest']!.replace(/^\//, '').replace(/\//g, String.fromCharCode(92))
+  return [drive, rest].join(String.fromCharCode(58, 92))
+}
 
 const URL_PREFIXES: readonly string[] = ['http://', 'https://', 'mailto:', 'tel:']
 
@@ -134,10 +173,14 @@ function resolveProgram(program: string): string {
     throw new DaMcpError('ENOENT', `Program not found: ${program}`)
   }
   const stdout = which.stdout
-  const resolved = typeof stdout === 'string' ? stdout.trim() : ''
+  let resolved = typeof stdout === 'string' ? stdout.trim() : ''
   if (resolved.length === 0) {
     throw new DaMcpError('ENOENT', `Program not found: ${program}`)
   }
+  // Git for Windows' `which` emits MSYS-style POSIX paths (`/c/Windows/...`)
+  // when Git Bash is on PATH. Node cannot spawn these — normalise to native
+  // Windows paths before returning. No-op on POSIX or already-converted paths.
+  resolved = msysToWindowsPath(resolved)
   return resolved
 }
 

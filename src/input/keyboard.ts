@@ -35,10 +35,38 @@ function buildChord(key: KeyName, modifiers: readonly Modifier[]): string {
   return [...modifiers, key].join('+')
 }
 
+/** Map MCP modifier names (per the JSON-Schema enum) to robotjs's expected flag names.
+ * robotjs rejects 'ctrl' as "Invalid key flag specified" — it expects 'control'.
+ * Exported for unit tests; not part of the public input API.
+ */
+export function toRobotjsModifier(name: string): string {
+  switch (name) {
+    case 'ctrl':
+      return 'control'
+    case 'meta':
+      return 'command'
+    default:
+      return name
+  }
+}
+
 /** Convert robotjs modifier + key into a single chord string. robotjs.keyTap accepts them as separate args. */
 function robotjsModifierArgs(modifiers: readonly Modifier[]): readonly string[] | undefined {
   if (modifiers.length === 0) return undefined
-  return modifiers
+  return modifiers.map(toRobotjsModifier)
+}
+
+/** Map MCP key names to robotjs's expected names. robotjs rejects 'return'
+ * (raises "Invalid key code specified" on older versions) — it expects 'enter'.
+ * Linux CLIs (xdotool/ydotool) accept canonical names and are NOT remapped.
+ * Exported for unit tests; not part of the public input API.
+ */
+const ROBOTJS_KEY_ALIASES: Readonly<Record<string, string>> = {
+  return: 'enter',
+}
+
+export function toRobotjsKey(name: string): string {
+  return ROBOTJS_KEY_ALIASES[name] ?? name
 }
 
 export async function keyTap(
@@ -75,10 +103,13 @@ export async function keyTap(
   // macOS / Windows
   const robotjs = await loadRobotjs()
   const modArg = robotjsModifierArgs(mods)
+  const rkey = toRobotjsKey(key)
   if (modArg === undefined) {
-    robotjs.keyTap(key)
+    robotjs.keyTap(rkey)
   } else {
-    robotjs.keyTap(key, modArg as string | string[])
+    // robotjs.keyTap takes each modifier as a separate positional arg
+    // (not an array — passing an array raises "Invalid key flag specified").
+    robotjs.keyTap(rkey, ...modArg)
   }
 }
 
@@ -97,7 +128,7 @@ export async function keyDown(key: KeyName): Promise<void> {
     return
   }
   const robotjs = await loadRobotjs()
-  robotjs.keyToggle(key, 'down')
+  robotjs.keyToggle(toRobotjsKey(key), 'down')
 }
 
 export async function keyUp(key: KeyName): Promise<void> {
@@ -115,7 +146,7 @@ export async function keyUp(key: KeyName): Promise<void> {
     return
   }
   const robotjs = await loadRobotjs()
-  robotjs.keyToggle(key, 'up')
+  robotjs.keyToggle(toRobotjsKey(key), 'up')
 }
 
 export async function typeText(text: string, opts?: TypeOptions): Promise<void> {
