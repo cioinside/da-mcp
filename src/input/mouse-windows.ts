@@ -53,7 +53,10 @@ export async function mouseMoveWindows(x: number, y: number): Promise<void> {
 export async function mouseClickWindows(button: MouseButton, count: number): Promise<void> {
   const flags = MOUSE_FLAGS[button]
   const lines: string[] = [
-    `Add-Type -TypeDefinition "@\\nusing System; using System.Runtime.InteropServices;\\npublic class M { [DllImport(\\"user32.dll\\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }\\n"@`,
+    `Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class M { [DllImport("user32.dll")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }
+"@`,
     `for ($i = 0; $i -lt ${String(count)}; $i++) {`,
     `  [M]::mouse_event(${String(flags.down)}, 0, 0, 0, 0)`,
     `  [M]::mouse_event(${String(flags.up)},   0, 0, 0, 0)`,
@@ -65,16 +68,24 @@ export async function mouseClickWindows(button: MouseButton, count: number): Pro
 export async function mouseDownWindows(button: MouseButton): Promise<void> {
   const flags = MOUSE_FLAGS[button]
   runPs(
-    `Add-Type -TypeDefinition "@\\nusing System; using System.Runtime.InteropServices;\\npublic class M { [DllImport(\\"user32.dll\\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }\\n"@\n` +
-    `[M]::mouse_event(${String(flags.down)}, 0, 0, 0, 0)\n`,
+    `Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class M { [DllImport("user32.dll")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }
+"@
+[M]::mouse_event(${String(flags.down)}, 0, 0, 0, 0)
+`,
   )
 }
 
 export async function mouseUpWindows(button: MouseButton): Promise<void> {
   const flags = MOUSE_FLAGS[button]
   runPs(
-    `Add-Type -TypeDefinition "@\\nusing System; using System.Runtime.InteropServices;\\npublic class M { [DllImport(\\"user32.dll\\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }\\n"@\n` +
-    `[M]::mouse_event(${String(flags.up)}, 0, 0, 0, 0)\n`,
+    `Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class M { [DllImport("user32.dll")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }
+"@
+[M]::mouse_event(${String(flags.up)}, 0, 0, 0, 0)
+`,
   )
 }
 

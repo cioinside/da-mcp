@@ -108,7 +108,10 @@ function toVKModifier(name: string): number {
   }
 }
 
-const ADD_TYPE_KEYBD = `Add-Type -TypeDefinition "@\\nusing System; using System.Runtime.InteropServices;\\npublic class K { [DllImport(\\"user32.dll\\")] public static extern void keybd_event(byte vk, byte sc, int flags, int extra); }\\n"@`
+const ADD_TYPE_KEYBD = `Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class K { [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte sc, int flags, int extra); }
+"@`
 
 function pressKey(vk: number, up: boolean): string {
   return `[K]::keybd_event(${String(vk)}, 0, ${up ? 2 : 0}, 0)`
