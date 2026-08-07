@@ -99,14 +99,7 @@ describe.skipIf(process.env['DA_MCP_TEST_MODE'] === 'mock')(
         it.skip(true, 'unsupported platform for e2e test')
         return
       }
-      let displays: DisplayInfo[]
-      try {
-        displays = await listDisplays()
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        it.skip(true, `no display available (listDisplays failed): ${msg}`)
-        return
-      }
+      const displays = await listDisplays()
       if (displays.length < 1) {
         it.skip(true, 'listDisplays() returned empty array — no display attached')
         return

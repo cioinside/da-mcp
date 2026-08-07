@@ -31,6 +31,9 @@ import {
   mockPngBuffer,
   validatePngBuffer,
 } from './png.js'
+import { listDisplaysLinux } from './list-displays-linux.js'
+import { listDisplaysMacos } from './list-displays-macos.js'
+import { listDisplaysWindows } from './list-displays-windows.js'
 import type { ScreenshotOptions, ScreenshotResult, ScreenshotSource } from './types.js'
 
 export type { ScreenshotOptions, ScreenshotResult, ScreenshotSource }
@@ -174,10 +177,19 @@ export async function listDisplays(): Promise<DisplayInfo[]> {
   if (isMockMode()) return [MOCK_DISPLAY]
   const info = detectPlatform()
   assertPlatformSupported(info)
-  throw new DaMcpError(
-    'NATIVE_MISSING',
-    `Display enumeration backend not available in this build (os=${info.os} display=${info.display}). Use da_window_list for window enumeration.`,
-  )
+  switch (info.os) {
+    case 'linux':
+      return listDisplaysLinux(info.display)
+    case 'darwin':
+      return listDisplaysMacos()
+    case 'win32':
+      return listDisplaysWindows()
+    default:
+      throw new DaMcpError(
+        'NATIVE_MISSING',
+        `Display enumeration backend not available for os=${info.os}. Use da_window_list for window enumeration.`,
+      )
+  }
 }
 
 // Suppress an unused-import lint when checkPngMagic is only re-exported.
