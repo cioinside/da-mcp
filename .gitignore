@@ -15,6 +15,10 @@ tessdata/
 # Node SEA (Single Executable Application) artifacts
 dist-sea/
 sea-config.json
+# Bundled SEA binary at repo root (built by `npm run build:sea`).
+# Without this, `da-mcp upgrade` refuses to run on a dirty working tree.
+da-mcp.exe
+da-mcp.exe.*
 
 # Tooling / runtime artifacts (not project source)
 .omo/
