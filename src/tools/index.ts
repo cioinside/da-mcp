@@ -18,6 +18,10 @@ import { daGetMousePosition } from './get-mouse-position.js'
 import { daMoveMouse } from './move-mouse.js'
 import { daClick } from './click.js'
 import { daClickText } from './click-text.js'
+import { daFindText } from './find-text.js'
+import { daWaitForWindow } from './wait-for-window.js'
+import { daWaitForText } from './wait-for-text.js'
+import { daVerifyPixels } from './verify-pixels.js'
 import { daDoubleClick } from './double-click.js'
 import { daDrag } from './drag.js'
 import { daDrawPath } from './draw-path.js'
@@ -35,10 +39,14 @@ export const ALL_TOOLS: readonly McpToolDefinition[] = [
   daListDisplays,
   daWindowList,
   daWindowFocus,
+  daWaitForWindow,
   daGetMousePosition,
   daMoveMouse,
   daClick,
   daClickText,
+  daFindText,
+  daWaitForText,
+  daVerifyPixels,
   daDoubleClick,
   daDrag,
   daDrawPath,
@@ -54,10 +62,14 @@ export {
   daListDisplays,
   daWindowList,
   daWindowFocus,
+  daWaitForWindow,
   daGetMousePosition,
   daMoveMouse,
   daClick,
   daClickText,
+  daFindText,
+  daWaitForText,
+  daVerifyPixels,
   daDoubleClick,
   daDrag,
   daDrawPath,

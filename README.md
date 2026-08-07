@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 
 ## Features
 
-16 tools registered under the `da_*` namespace:
+20 tools registered under the `da_*` namespace:
 
 ### Capture
 - **`da_screenshot`** — Capture full screen or a specific display as PNG.
@@ -18,12 +18,18 @@ A Model Context Protocol (MCP) server that lets AI agents (OpenCode, Claude Desk
 - **`da_move_mouse`** — Move the cursor to (x, y).
 - **`da_click`** — Click at (x, y) with optional button (left/right/middle/back/forward) and count.
 - **`da_click_text`** — OCR-then-click: find a UI element by visible text (exact or fuzzy) and click its center. Returns `NOT_FOUND` if no match.
+- **`da_find_text`** — Same OCR+match pipeline as `da_click_text` but stops before the click — returns the bbox/center/confidence so the agent can decide what action to take (click vs. drag vs. right-click).
 - **`da_double_click`** — Convenience wrapper for double-click.
 - **`da_drag`** — Drag from (x1, y1) to (x2, y2).
-- **`da_draw_path`** — Trace a multi-point mouse path with optional `Modifier[]` held throughout (try/finally guarantees modifier cleanup).
+- **`da_draw_path`** — Trace a multi-point mouse path with optional `Modifier[]` held throughout (try/finally guarantees modifier cleanup). Used for freeform shapes (circles, signatures) and for constrained drawing in Paint (`modifiers:["shift"]`).
 - **`da_scroll`** — Scroll wheel at (x, y) by (dx, dy).
 - **`da_type`** — Type a string at the current focus.
 - **`da_key`** — Press a single key or chord (e.g. `Ctrl+C`).
+
+### Stability / verification
+- **`da_wait_for_window`** — Poll `da_window_list` until a window with a matching title appears (substring/exact/regex). Use after `da_launch` to wait for the app to paint before clicking inside.
+- **`da_wait_for_text`** — Poll the OCR text-match pipeline until `text` appears on screen. Use after any state-changing action to confirm the new state is visible before continuing.
+- **`da_verify_pixels`** — Poll the screen until a pixel-level predicate holds: `{kind:"color", rgb, minCount}` (count matching pixels) or `{kind:"diff", baseline, threshold}` (fraction differing from a baseline PNG). E.g. wait until 200+ red pixels appear on the canvas region after drawing a circle in Paint.
 
 ### Launch
 - **`da_launch`** — Launch a program by name or path; returns a spawn handle with PID + POSIX signal exit codes (SIGINT=130, SIGTERM=143, SIGHUP=129, SIGKILL=137, SIGQUIT=131, SIGABRT=134).
@@ -77,7 +83,7 @@ The `da_ocr` classifier tags each detected text region with one of:
   - **Input** — `src/input/{routing,mouse,keyboard,scroll,drag,types,index}.ts` plus per-OS backends `mouse-{macos,windows}.ts`, `keyboard-{macos,windows}.ts`, `scroll-{macos,windows}.ts`, `clipboard.ts`. Shared routing helpers (`runCli`, `resolveRouting`, `requireTool`, `isMockMode`, `validateCoords`, `Routing`) in `routing.ts`. Linux paths shell out to `xdotool`/`ydotool`/`wtype`. Windows path uses PowerShell + `user32` (`keybd_event`, `mouse_event`, `SetCursorPos`, `GetCursorPos`); Unicode text goes via clipboard + Ctrl+V. macOS is a stub in v1.0.0 (tracked by #19) — surfaces a "not implemented in #13" error. No native NAPI binary — see #13.
   - **Launch** — `src/launch/{launch,types}.ts`. `open(1)` + `child_process.spawn` (shell:false); `SIGNAL_EXIT_CODES` map for POSIX signal mapping.
   - **Platform** — `src/platform/{detect,types}.ts`. `detectPlatform()` returns `{ os, display, tools, home }`; `assertPlatformSupported()` throws `PLATFORM_INIT_FAILED` on unsupported combos.
-  - **Server** — `src/server.ts`. Registers 14 tools, wraps handler results into `CallToolResult` with `structuredContent` (Buffers stripped to `number[]` for JSON-safety), installs SIGINT/SIGTERM shutdown.
+  - **Server** — `src/server.ts`. Registers 20 tools, wraps handler results into `CallToolResult` with `structuredContent` (Buffers stripped to `number[]` for JSON-safety), installs SIGINT/SIGTERM shutdown.
   - **Server instructions** — `src/server-instructions.ts`. Exports `SERVER_INSTRUCTIONS`, a string surfaced to the AI agent via the MCP `instructions` field (MCP spec, `ServerOptions.instructions`). Tells the agent it IS the orchestrator — call the 14 `da_*` tools directly through the MCP client, do NOT write an orchestrator script that imports/spawns the server. Edit this string to update the agent-facing announcement.
   - **Window** — `src/window/{types,list,list-linux,list-macos,list-windows,focus,resolve,index}.ts`. Per-OS list backends (wmctrl / osascript / PowerShell+EnumWindows) keep each file under the 250 LOC ceiling; pure-JS `matchOne` resolver in `resolve.ts` for title matching.
 
@@ -355,7 +361,7 @@ npx vitest
 ### Test inventory
 
 - **28 unit test files + 2 e2e** (e2e skip in mock mode)
-- **415 tests passing / 18 skipped / 0 failed** in `DA_MCP_TEST_MODE=mock npm test` (e2e require real X11/tesseract; input dispatcher tests cover per-OS stubs for macOS + Windows PowerShell paths)
+- **415 tests passing / 18 skipped / 0 failed** in `DA_MCP_TEST_MODE=mock npm test` (e2e require real X11/tesseract; input dispatcher tests cover per-OS stubs for macOS + Windows PowerShell paths). Post-tool additions: `da_find_text`, `da_wait_for_window`, `da_wait_for_text`, `da_verify_pixels` bring the total to 471 passing.
 - **Test runtime**: `process.env['DA_MCP_TEST_MODE'] === 'mock'` short-circuits native calls; `_mock.ts` modules inject deterministic native modules
 
 ### Conventions

@@ -112,9 +112,9 @@ describe('da_launch handler', () => {
 })
 
 describe('ALL_TOOLS registry', () => {
-  // Test 17: registry has exactly 16 tools.
-  it('ALL_TOOLS has exactly 16 entries', () => {
-    expect(ALL_TOOLS).toHaveLength(16)
+  // Test 17: registry has exactly 20 tools.
+  it('ALL_TOOLS has exactly 20 entries', () => {
+    expect(ALL_TOOLS).toHaveLength(20)
   })
 
   // Test 18: all tool names are unique.

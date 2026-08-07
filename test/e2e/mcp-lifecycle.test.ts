@@ -93,12 +93,12 @@ describe('mcp wire-protocol lifecycle', () => {
     await server.close()
   })
 
-  it('tools/list returns exactly 16 tools with name/description/inputSchema', async () => {
+  it('tools/list returns exactly 20 tools with name/description/inputSchema', async () => {
     const { client } = await setupPair()
     const r = asResult(
       await rpc(client, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }),
     ) as { tools: { name: string; description?: string; inputSchema?: unknown }[] }
-    expect(r.tools).toHaveLength(16)
+    expect(r.tools).toHaveLength(20)
     for (const t of r.tools) {
       expect(typeof t.name).toBe('string')
       expect(typeof t.description).toBe('string')
