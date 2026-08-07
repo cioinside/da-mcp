@@ -20,6 +20,7 @@
     "test:integration": "vitest run test/integration",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
+    "check:version": "tsx scripts/check-version-sync.ts",
     "upgrade": "tsx src/server-dispatch.ts upgrade",
     "install-service": "tsx src/server-dispatch.ts install-service",
     "uninstall-service": "tsx src/server-dispatch.ts uninstall-service",

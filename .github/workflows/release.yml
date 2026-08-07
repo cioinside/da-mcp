@@ -41,6 +41,8 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
+      - name: Check version sync (package.json == src/version.ts)
+        run: npm run check:version
       - run: DA_MCP_TEST_MODE=mock npm test
 
   build-win32-x64:
@@ -55,6 +57,8 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
+      - name: Check version sync (package.json == src/version.ts)
+        run: npm run check:version
       - name: SEA build for win32-x64
         run: bash scripts/build-sea.sh win32-x64
       - name: Upload win32-x64 binary
