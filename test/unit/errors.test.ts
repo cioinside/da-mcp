@@ -95,6 +95,7 @@ describe('ERROR_CODE_MESSAGES', () => {
       'INVALID_ARGUMENT',
       'INTERNAL',
       'NOT_FOUND',
+      'NETWORK_FAILED',
     ]
     for (const code of codes) {
       expect(ERROR_CODE_MESSAGES[code], `missing message for ${code}`).toBeDefined()

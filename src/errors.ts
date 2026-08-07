@@ -29,6 +29,7 @@ export type ErrorCode =
   | 'INVALID_ARGUMENT'         // schema validation failed (rare; Zod catches most)
   | 'INTERNAL'                 // unexpected — should not happen
   | 'NOT_FOUND'                // query returned no matching resource (e.g. window title substring matched no visible window)
+  | 'NETWORK_FAILED'           // outbound HTTP request failed (GitHub Releases API, etc.)
 
 // Stable, human-readable mapping for logs and MCP error text.
 export const ERROR_CODE_MESSAGES: Readonly<Record<ErrorCode, string>> = {
@@ -47,6 +48,7 @@ export const ERROR_CODE_MESSAGES: Readonly<Record<ErrorCode, string>> = {
   INVALID_ARGUMENT: 'Invalid argument',
   INTERNAL: 'Internal server error',
   NOT_FOUND: 'No matching resource found',
+  NETWORK_FAILED: 'Outbound network request failed',
 }
 
 // Single error class used by all modules.
