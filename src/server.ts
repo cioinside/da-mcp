@@ -21,6 +21,7 @@ import { SERVER_INSTRUCTIONS } from './server-instructions.js'
 import { DaMcpError, toDaMcpError, type ErrorCode } from './errors.js'
 import { initConfig, getConfig } from './config.js'
 import { getLogger } from './log.js'
+import { buildResultContent } from './server-result-content.js'
 
 interface ErrorEnvelope {
   code: ErrorCode
@@ -69,7 +70,7 @@ export async function wrapHandlerResult(
     const result = await handler(args)
     const structured = bufferToBytes(result) as Record<string, unknown>
     return {
-      content: [{ type: 'text', text: JSON.stringify(result, undefined, 2) }],
+      content: buildResultContent(result, structured),
       structuredContent: structured,
     }
   } catch (value: unknown) {

@@ -6,8 +6,15 @@ import { InMemoryTransport, type JSONRPCMessage } from '@modelcontextprotocol/se
 import { initConfig, resetConfig } from '../../src/config.js'
 import { createMcpServer } from '../../src/server.js'
 
+type ContentBlock = {
+  type: string
+  text?: string
+  data?: string
+  mimeType?: string
+}
+
 type R = {
-  content?: { type: string; text: string }[]
+  content?: ContentBlock[]
   isError?: boolean
   structuredContent?: Record<string, unknown>
 }
@@ -114,7 +121,7 @@ describe('mcp wire-protocol lifecycle', () => {
     for (const t of r.tools) expect(t.name.startsWith('da_')).toBe(true)
   })
 
-  it('da_screenshot { displayId: null } returns PNG buffer via structuredContent', async () => {
+  it('da_screenshot { displayId: null } emits MCP ImageContent for PNG + metadata text', async () => {
     const { client } = await setupPair()
     const r = asResult(
       await rpc(client, {
@@ -125,10 +132,27 @@ describe('mcp wire-protocol lifecycle', () => {
       }),
     ) as R
     expect(r.isError).toBeFalsy()
-    expect(r.content).toHaveLength(1)
-    expect(r.content?.[0]?.type).toBe('text')
-    expect(JSON.parse(r.content?.[0]?.text ?? '{}')).toMatchObject({ length: 8 })
-    const sc = r.structuredContent as { buffer: { length: number; [n: number]: number }; length: number }
+    expect(r.content).toHaveLength(2)
+
+    const image = r.content?.[0]
+    expect(image?.type).toBe('image')
+    expect(image?.mimeType).toBe('image/png')
+    expect(typeof image?.data).toBe('string')
+    expect((image?.data ?? '').length).toBeGreaterThan(0)
+    const decoded = Buffer.from(image?.data ?? '', 'base64')
+    expect(decoded.length).toBe(8)
+    expect(decoded[0]).toBe(0x89)
+
+    const text = r.content?.[1]
+    expect(text?.type).toBe('text')
+    const meta = JSON.parse(text?.text ?? '{}') as { length?: number; buffer?: unknown }
+    expect(meta.length).toBe(8)
+    expect(meta.buffer).toBeUndefined()
+
+    const sc = r.structuredContent as {
+      buffer: { length: number; [n: number]: number }
+      length: number
+    }
     expect(sc.buffer.length).toBe(8)
     expect(sc.buffer[0]).toBe(0x89)
     expect(sc.length).toBe(8)
