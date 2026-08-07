@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
 import { initConfig, getConfig, resetConfig } from '../../src/config.js'
 import { DaMcpError } from '../../src/errors.js'
 import { runOcr } from '../../src/ocr/index.js'
+import { runCli } from '../../src/ocr/cli.js'
 import { classifyUiElements } from '../../src/ocr/classify.js'
 import type { OCRLine, UIElement } from '../../src/ocr/types.js'
 
@@ -144,27 +146,33 @@ describe('runOcr OCR_FAILED (CLI ENOENT + wasm unavailable)', () => {
     expect(getConfig().testMode).toBe('real')
     expect(getConfig().ocrBackend).toBe('cli')
 
-    // Simulate tesseract CLI missing on PATH.
     vi.doMock('node:child_process', async () => {
       const actual =
         await vi.importActual<typeof import('node:child_process')>('node:child_process')
       return {
         ...actual,
-        spawnSync: () => ({
-          status: null,
-          signal: null,
-          output: [],
-          pid: 0,
-          stdout: '',
-          stderr: '',
-          error: Object.assign(new Error('spawnSync tesseract ENOENT'), {
-            code: 'ENOENT' as const,
-          }),
-        }),
+        spawn: () => {
+          const ee = new EventEmitter()
+          Object.assign(ee, {
+            stdin: { on: () => {}, end: () => {} },
+            stdout: { on: () => {} },
+            stderr: { on: () => {} },
+            pid: 0,
+            kill: () => true,
+          })
+          process.nextTick(() => {
+            ee.emit(
+              'error',
+              Object.assign(new Error('spawn tesseract ENOENT'), {
+                code: 'ENOENT' as const,
+              }),
+            )
+          })
+          return ee
+        },
       }
     })
 
-    // Simulate tesseract.js not installed.
     vi.doMock('tesseract.js', () => {
       throw new Error("Cannot find module 'tesseract.js'")
     })
@@ -182,5 +190,28 @@ describe('runOcr OCR_FAILED (CLI ENOENT + wasm unavailable)', () => {
       resetConfig()
       initConfig({ DA_MCP_TEST_MODE: 'mock' })
     }
+  })
+})
+
+describe('runCli async contract (regression for #28 bug 2)', () => {
+  it('returns a Promise so the Node event loop is not blocked during spawn', async () => {
+    resetConfig()
+    initConfig({ DA_MCP_TEST_MODE: 'real' })
+
+    const promise = runCli(PNG_HEADER, 'eng', 1000)
+    expect(promise).toBeInstanceOf(Promise)
+
+    let ticked = false
+    setTimeout(() => {
+      ticked = true
+    }, 10)
+
+    await promise.catch(() => {
+      void 0
+    })
+
+    expect(ticked).toBe(true)
+    resetConfig()
+    initConfig({ DA_MCP_TEST_MODE: 'mock' })
   })
 })

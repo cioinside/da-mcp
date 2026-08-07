@@ -54,7 +54,7 @@ export async function runOcr(opts: {
   }
   const lang = opts.lang ?? DEFAULT_OCR_LANG
   try {
-    return runCli(image, lang, cfg.subprocessTimeoutMs)
+    return await runCli(image, lang, cfg.subprocessTimeoutMs)
   } catch (cliErr) {
     try {
       return await runWasm(image, lang)
