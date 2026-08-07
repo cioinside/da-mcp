@@ -166,24 +166,46 @@ DA_MCP_TEST_MODE=mock npm test
 
 ## Upgrading
 
-A single CLI command updates an installed `da-mcp` working tree to the latest committed version on the current branch and rebuilds it:
+`da-mcp upgrade` is a single CLI command that self-updates **whichever way you installed it** — the entry point auto-detects binary vs source mode (`process.execPath === process.argv[1]`), so the same command works for both the single-binary release and a source checkout:
 
 ```bash
-# from inside the repo:
+# Binary install (Windows single-binary release):
+.\da-mcp.exe upgrade
+
+# Source install (Linux/macOS/Windows dev workflow):
 node /projects/da-mcp/dist/server-dispatch.js upgrade
-# or, equivalently:
+# or:
 npm run upgrade
 ```
 
-`upgrade` performs (only when the working tree is clean):
+Both modes accept `--force` (alias `-f`). Pass it to reinstall even when the version comparison says you're up to date, or (in source mode) to discard uncommitted local changes.
 
-1. `git fetch origin` + `git reset --hard origin/<current-branch>`
-2. `npm ci` — locked, reproducible dependency install
-3. `npm run build` — TypeScript compile to `dist/`
-4. `npm run typecheck` — strict-mode smoke check
-5. After a successful upgrade, if a `da-mcp` system service is registered (see below), the command restarts it via `systemctl` / `launchctl` / `sc.exe`. Otherwise it prints a one-line reminder to restart your MCP client manually.
+### Binary mode (`da-mcp.exe upgrade`)
 
-The command **refuses** to run when the working tree has uncommitted changes — run `git status` and `git stash` them first. Pass `--force` to override (discards local changes).
+For a Node SEA single-binary install (e.g. Windows `da-mcp-win32-x64.exe`):
+
+1. **Query GitHub Releases** — `GET https://api.github.com/repos/cioinside/da-mcp/releases/latest` returns the latest non-prerelease release with its asset list and sha256 digests.
+2. **Compare versions** — the embedded build-time constant (`process.env.DA_MCP_VERSION`, injected by esbuild `--define` in `scripts/build-sea.sh`) is compared against `tag_name`. If the running version is already ≥ the release, the command is a no-op (unless `--force`).
+3. **Pick the matching asset** — `da-mcp-{platform}-{arch}[.exe]` for the current `process.platform` + `process.arch`.
+4. **Download** to `${execPath}.new.<ts>` (sibling of the running binary, never overwriting it in place).
+5. **Verify sha256** if the asset has a `digest: sha256:…` field — mismatches abort before any rename.
+6. **Atomic replace** — rename the running binary to `${execPath}.old.<ts>` (Windows allows renaming a running executable; the process keeps its file handle), then rename the staged file to `execPath`. On failure, the staged file is left behind and the original is untouched.
+7. **Restart the service** if one is registered via `install-service` (see below). If no service is installed, prints a one-line reminder to restart your MCP client manually.
+
+The previous binary is kept at `${execPath}.old.<ts>` so the operator can roll back manually if the new binary misbehaves on first launch.
+
+### Source mode (`npm run upgrade`)
+
+For a source checkout (any OS):
+
+1. **Refuse dirty trees** — `git status --porcelain` must be empty unless `--force` is passed.
+2. **`git fetch origin <branch>` + `git reset --hard origin/<branch>`** — fast-forward to the latest commit on the current branch.
+3. **`npm ci`** — locked, reproducible dependency install.
+4. **`npm run build`** — TypeScript compile to `dist/`.
+5. **`npm run typecheck`** — strict-mode smoke check.
+6. **Restart the service** if one is registered, or print a reminder to restart the MCP client manually.
+
+The command refuses to run on a detached HEAD — check out a branch first.
 
 ### Run `da-mcp` as a system service (auto-restart)
 
@@ -332,8 +354,8 @@ npx vitest
 
 ### Test inventory
 
-- **27 unit test files + 2 e2e** (e2e skip in mock mode)
-- **358 tests passing / 18 skipped / 0 failed** in `DA_MCP_TEST_MODE=mock npm test` (e2e require real X11/tesseract; input dispatcher tests cover per-OS stubs for macOS + Windows PowerShell paths)
+- **28 unit test files + 2 e2e** (e2e skip in mock mode)
+- **415 tests passing / 18 skipped / 0 failed** in `DA_MCP_TEST_MODE=mock npm test` (e2e require real X11/tesseract; input dispatcher tests cover per-OS stubs for macOS + Windows PowerShell paths)
 - **Test runtime**: `process.env['DA_MCP_TEST_MODE'] === 'mock'` short-circuits native calls; `_mock.ts` modules inject deterministic native modules
 
 ### Conventions
