@@ -43,7 +43,10 @@ export async function mouseScrollWindows(dx: number, dy: number, stepPx: number)
   if (dy !== 0) {
     const delta = dy > 0 ? -absDy : absDy
     dyLines.push(
-      `Add-Type -TypeDefinition "@\\nusing System; using System.Runtime.InteropServices;\\npublic class M { [DllImport(\\"user32.dll\\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }\\n"@`,
+      `Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class M { [DllImport("user32.dll")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }
+"@`,
     )
     for (let i = 0; i < absDy; i++) {
       dyLines.push(`[M]::mouse_event(0x0800, 0, 0, ${String(delta)}, 0)`)
@@ -54,7 +57,10 @@ export async function mouseScrollWindows(dx: number, dy: number, stepPx: number)
     const delta = dx > 0 ? absDx : -absDx
     if (dy === 0) {
       dxLines.push(
-        `Add-Type -TypeDefinition "@\\nusing System; using System.Runtime.InteropServices;\\npublic class M { [DllImport(\\"user32.dll\\")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }\\n"@`,
+        `Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class M { [DllImport("user32.dll")] public static extern void mouse_event(int f, int dx, int dy, int d, int e); }
+"@`,
       )
     }
     for (let i = 0; i < absDx; i++) {
