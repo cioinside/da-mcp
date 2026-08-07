@@ -293,13 +293,25 @@ export async function launchProgram(
 
   const resolvedPath = resolveProgram(head)
 
+  // Default-detached: da_launch is fire-and-forget; an agent that asks
+  // "open mspaint" expects the app to stay open after the tool call returns.
+  const detached = opts.detached ?? true
+
   const child: ChildProcess = spawn(resolvedPath, argv.slice(1), {
     cwd: opts.cwd,
     env: opts.env ?? process.env,
     stdio: toNodeStdio(opts.stdio),
     shell: false,
-    detached: opts.detached ?? true,
+    detached,
   })
+
+  // Drop the child handle from the parent's event loop. Without unref(),
+  // the parent waits on the child even though detached:true makes the child
+  // its own session leader on Unix; on Windows, parent exit can still pull
+  // down detached children whose stdio/job object is shared with the parent.
+  if (detached) {
+    child.unref()
+  }
 
   const terminationFlag = makeTerminationFlag()
   const exitedPromise = new Promise<number>((resolve, reject) => {
@@ -315,7 +327,15 @@ export async function launchProgram(
     })
   })
 
-  const timeoutMs = opts.timeoutMs ?? getConfig().subprocessTimeoutMs
+  // detached (fire-and-forget apps): no default timeout — SIGTERMing a
+  // long-running app because the caller forgot timeoutMs is a footgun.
+  // Non-detached: defer to subprocessTimeoutMs (default for short CLIs).
+  const timeoutMs =
+    opts.timeoutMs !== undefined
+      ? opts.timeoutMs
+      : detached
+        ? 0
+        : getConfig().subprocessTimeoutMs
   let finalExited: Promise<number> = exitedPromise
   if (typeof timeoutMs === 'number' && timeoutMs > 0) {
     let timer: NodeJS.Timeout | null = null

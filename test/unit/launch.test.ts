@@ -250,3 +250,29 @@ describe('launchProgram — timeout-induced termination', () => {
     expect(handle.killed).toBe(true)
   })
 })
+
+describe('launchProgram — detached default behavior', () => {
+  // Regression: detached launches must NOT inherit subprocessTimeoutMs.
+  // The previous code SIGTERMed every launched app 30s after the tool call
+  // returned because subprocessTimeoutMs defaulted to 30000. da_launch's
+  // whole point is fire-and-forget — the app has to outlive the tool call.
+  it('does NOT apply subprocessTimeoutMs to a detached (default) launch', async () => {
+    const handle = await launchProgram(['sleep', '0.5'])
+    expect(handle.pid).not.toBeNull()
+    expect(handle.killed).toBe(false)
+    // Wait past the original 30000ms default; the sleep(0.5) must finish
+    // naturally with exit code 0, not be SIGTERMed.
+    const code = await handle.exited
+    expect(code).toBe(0)
+    expect(handle.killed).toBe(false)
+  }, 10000)
+
+  it('explicit detached: false falls back to subprocessTimeoutMs', async () => {
+    // Non-detached launches are short-CLI helpers; the default timeout is
+    // what protects them from hanging. Confirms we didn't break that path.
+    const handle = await launchProgram(['sleep', '5'], { detached: false, timeoutMs: 100 })
+    const code = await handle.exited
+    expect(code).toBe(143)
+    expect(handle.killed).toBe(true)
+  })
+})
