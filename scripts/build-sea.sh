@@ -56,11 +56,20 @@ mkdir -p "$ARTIFACT_DIR"
 # (node:internal/main/embedding:60); ESM bundles fail with "Cannot use
 # import statement outside a module" even when the file has a `.mjs`
 # extension.
+#
+# `--define:process.env.DA_MCP_VERSION=...` substitutes the literal at
+# bundle time so `server-dispatch.ts:readEmbeddedVersion()` can know the
+# version of the running binary without `package.json` on disk. This is
+# what powers `da-mcp upgrade` in binary mode: it compares the embedded
+# version to the latest GitHub release tag.
+DA_MCP_VERSION="$(node -p "require('./package.json').version")"
+export DA_MCP_VERSION
 npx --yes esbuild src/server-dispatch.ts \
   --bundle \
   --platform=node \
   --target=node22 \
   --format=cjs \
+  --define:process.env.DA_MCP_VERSION="\"${DA_MCP_VERSION}\"" \
   --outfile="$BUNDLE"
 
 NODE_BIN="$(command -v node)"
