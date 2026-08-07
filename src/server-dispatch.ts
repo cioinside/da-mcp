@@ -38,11 +38,12 @@ function runWithTransport(): Promise<void> {
 }
 
 function resolveProjectRoot(): string {
-  // For `node dist/server-dispatch.js` the entry is argv[1] (the script
-  // path); for a Node SEA binary argv[1] equals argv[0] (the binary
-  // itself). dirname + ../../ lands on the repo root in the former case,
-  // and on the binary's grandparent in the latter — only used by
-  // upgrade/install-service, which don't apply to SEA anyway.
+  // For `node dist/server-dispatch.js` argv[1] is the script path; for a
+  // Node SEA binary argv[1] is the first user argument (e.g. "upgrade"),
+  // so the dirname trick only works in source mode. dirname + ../../
+  // lands on the repo root for source installs; for SEA it returns the
+  // binary's grandparent, but resolveProjectRoot is only consumed by
+  // source-mode upgrade / install-service, which never run under SEA.
   return path.resolve(path.dirname(process.argv[1] ?? process.execPath), '..', '..')
 }
 
@@ -87,16 +88,32 @@ function printBinaryUpgradeSummary(r: UpgradeBinaryResult): void {
 }
 
 /**
+ * Pure SEA-vs-source detector — true iff `execName` is the basename of a
+ * Node SEA host executable, false for source-install Node binaries.
+ *
+ * Used by `isBinaryInstall()`; extracted so the detection logic can be
+ * unit-tested without touching `process.execPath`.
+ *
+ * Source mode: `node`, `node.exe`, `node-22.0.0`, `node-22.0.0.exe`,
+ * `node-v22.10.0` (nvm/nvs versioned shims).
+ * SEA mode: anything else (e.g. `da-mcp.exe`).
+ */
+export function isBinaryExecName(execName: string): boolean {
+  const lower = execName.toLowerCase()
+  return !(lower === 'node' || lower === 'node.exe' || /^node[-.]/.test(lower))
+}
+
+/**
  * True when the entry is a Node SEA binary, false for source installs.
  *
- * For `node dist/server-dispatch.js`, `process.execPath` is the Node
- * binary and `argv[1]` is the script — they differ. For a Node SEA
- * binary, `argv[0]` and `argv[1]` both equal the binary path
- * (SEA-compat in server-dispatch.ts sets argv[1] = execPath), so the
- * equality holds.
+ * Detection: in source mode `process.execPath` is the `node` binary
+ * (`node`, `node.exe`, or `node-<version>`); in Node SEA mode it is the
+ * host executable (e.g. `da-mcp.exe`). argv[1] is NOT a reliable
+ * indicator — it's the first user argument in SEA mode (e.g. "upgrade"),
+ * not the binary path.
  */
 export function isBinaryInstall(): boolean {
-  return process.execPath === (process.argv[1] ?? '')
+  return isBinaryExecName(path.basename(process.execPath))
 }
 
 /** esbuild --define target: process.env.DA_MCP_VERSION is replaced at bundle time. */
