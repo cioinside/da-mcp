@@ -150,7 +150,9 @@ function focusWindowMacos(
 
 // ─── Windows: PowerShell + Add-Type + user32!SetForegroundWindow ────────────
 
-const WIN_FOCUS_PS1 = [
+// Wrap in `& { ... }`: PowerShell `-Command "<script>" arg1 arg2` would
+// otherwise concatenate trailing args to the LAST line, not to `param()`.
+export const WIN_FOCUS_SCRIPT = [
   'param([Int64]$h, [bool]$bringToTop)',
   'Add-Type -TypeDefinition @"',
   'using System;',
@@ -173,6 +175,7 @@ const WIN_FOCUS_PS1 = [
   '"@ -ErrorAction SilentlyContinue',
   '[WinFocus]::Focus([IntPtr]$h, $bringToTop)',
 ].join('\n')
+export const WIN_FOCUS_PS1 = `& { ${WIN_FOCUS_SCRIPT} }`
 
 function focusWindowWindows(
   hwnd: number,

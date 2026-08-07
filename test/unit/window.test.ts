@@ -17,6 +17,7 @@ import {
   resolveWindow,
   matchOne,
 } from '../../src/window/index.js'
+import { WIN_FOCUS_PS1, WIN_FOCUS_SCRIPT } from '../../src/window/focus.js'
 import type { WindowInfo } from '../../src/window/types.js'
 
 // ─── Top-level mock mode: DA_MCP_TEST_MODE=mock ──────────────────────────────
@@ -172,6 +173,26 @@ describe('focusWindow (mock mode)', () => {
   it('respects bringToTop flag in mock mode (echoes, no real effect)', () => {
     expect(focusWindow(1, 'x', 1, false).foreground).toBe(true)
     expect(focusWindow(1, 'x', 1, true).foreground).toBe(true)
+  })
+})
+
+// ─── WIN_FOCUS_PS1 — script structure (regression guard for #20) ────────────
+
+describe('WIN_FOCUS_PS1 (script structure, #20 regression guard)', () => {
+  it('is wrapped in `& { ... }` so param() receives trailing args', () => {
+    // PowerShell `-Command "<script>" arg1 arg2` would otherwise concatenate
+    // trailing args to the LAST line, parsing them as positional args to the
+    // last cmdlet/method call instead of binding to the script's `param()`.
+    expect(WIN_FOCUS_PS1.startsWith('& { ')).toBe(true)
+    expect(WIN_FOCUS_PS1.endsWith(' }')).toBe(true)
+  })
+
+  it('contains the param() declaration so args bind to named parameters', () => {
+    expect(WIN_FOCUS_PS1).toContain('param([Int64]$h, [bool]$bringToTop)')
+  })
+
+  it('embeds the inner script body inside the wrap', () => {
+    expect(WIN_FOCUS_PS1).toContain(WIN_FOCUS_SCRIPT)
   })
 })
 
