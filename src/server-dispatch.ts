@@ -24,6 +24,7 @@ import {
 } from './server.js'
 import { defaultExec } from './cli/exec.js'
 import { runUpgrade, type UpgradeResult } from './cli/upgrade.js'
+import { runUpgradeBinary, type UpgradeBinaryResult, defaultFs } from './cli/upgrade-binary.js'
 import { installService } from './cli/install-service.js'
 import { uninstallService } from './cli/install-service.js'
 
@@ -74,6 +75,67 @@ function printUpgradeSummary(r: UpgradeResult): void {
   stdoutLine('  cp docs/skills/da-ui-orchestrator.md ~/.config/opencode/skills/da-ui-orchestrator/SKILL.md')
 }
 
+function printBinaryUpgradeSummary(r: UpgradeBinaryResult): void {
+  stdoutLine(`da-mcp upgrade (binary): ${r.currentVersion} → ${r.latestVersion}`)
+  stdoutLine(`changed: ${r.changed ? 'yes' : 'no'}`)
+  if (r.changed) {
+    stdoutLine(`asset: ${r.assetName} (${r.downloadBytes} bytes, sha256 ${r.verified ? 'verified' : 'unverified'})`)
+    stdoutLine(`backup: ${r.backupPath}`)
+  }
+  stdoutLine(`service restart: ${r.restart.attempted ? (r.restart.ok ? 'ok' : 'failed') : 'skipped'} — ${r.restart.detail}`)
+  stdoutLine(`release: ${r.releaseUrl}`)
+}
+
+/**
+ * True when the entry is a Node SEA binary, false for source installs.
+ *
+ * For `node dist/server-dispatch.js`, `process.execPath` is the Node
+ * binary and `argv[1]` is the script — they differ. For a Node SEA
+ * binary, `argv[0]` and `argv[1]` both equal the binary path
+ * (SEA-compat in server-dispatch.ts sets argv[1] = execPath), so the
+ * equality holds.
+ */
+export function isBinaryInstall(): boolean {
+  return process.execPath === (process.argv[1] ?? '')
+}
+
+/** esbuild --define target: process.env.DA_MCP_VERSION is replaced at bundle time. */
+function readEmbeddedVersion(): string {
+  const v = process.env['DA_MCP_VERSION']
+  return typeof v === 'string' && v.length > 0 ? v : '0.0.0'
+}
+
+async function runBinaryUpgrade(force: boolean): Promise<void> {
+  const currentVersion = readEmbeddedVersion()
+  const result = await runUpgradeBinary({
+    repo: 'cioinside/da-mcp',
+    currentVersion,
+    execPath: process.execPath,
+    platform: process.platform,
+    arch: process.arch,
+    force,
+    exec: defaultExec(),
+    fs: defaultFs(),
+    env: process.env,
+    log: stdoutLine,
+  })
+  printBinaryUpgradeSummary(result)
+  if (result.changed) {
+    stdoutLine('Restart any MCP clients connected to this binary (or rely on the service supervisor above).')
+  }
+}
+
+async function runSourceUpgrade(force: boolean): Promise<void> {
+  const result = await runUpgrade({
+    projectRoot: resolveProjectRoot(),
+    force,
+    exec: defaultExec(),
+    env: process.env,
+    log: stdoutLine,
+  })
+  printUpgradeSummary(result)
+}
+
 /**
  * Run the CLI's top-level dispatch. Resolves once the chosen subcommand
  * completes; the caller is responsible for process exit on error.
@@ -88,13 +150,8 @@ export function runCli(argv: readonly string[]): Promise<void> {
   }
   if (argv[2] === 'upgrade') {
     const force = argv.includes('--force') || argv.includes('-f')
-    return runUpgrade({
-      projectRoot: resolveProjectRoot(),
-      force,
-      exec: defaultExec(),
-      env: process.env,
-      log: stdoutLine,
-    }).then(printUpgradeSummary).then(() => undefined)
+    const runner = isBinaryInstall() ? runBinaryUpgrade : runSourceUpgrade
+    return runner(force).then(() => undefined)
   }
   if (argv[2] === 'install-service') {
     return installService(commonServiceOpts()).then((r) => {
@@ -121,7 +178,7 @@ function printUsage(): void {
       'Usage:',
       '  node dist/server-dispatch.js                     run the stdio MCP server (default)',
       '  node dist/server-dispatch.js token regenerate    regenerate the HTTP auth token',
-      '  node dist/server-dispatch.js upgrade [--force]   pull origin, rebuild, restart service',
+      '  node dist/server-dispatch.js upgrade [--force]   self-update (source: git pull + rebuild; binary: replace from latest GitHub release)',
       '  node dist/server-dispatch.js install-service     register systemd / launchd / Windows service',
       '  node dist/server-dispatch.js uninstall-service   remove the registered service',
       '  node dist/server-dispatch.js help                show this message',
@@ -130,7 +187,7 @@ function printUsage(): void {
       '  DA_MCP_TRANSPORT    stdio (default) or http — transport for the running server',
       '  DA_MCP_HTTP_HOST    bind address (default 0.0.0.0)',
       '  DA_MCP_PORT         HTTP port (default 3000)',
-      '  DA_MCP_TOKEN_PATH   override token-file location',
+      '  DA_MCP_TOKEN_PATH   override token-file storage path',
       '',
     ].join('\n'),
   )
