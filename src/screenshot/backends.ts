@@ -144,7 +144,12 @@ export async function screenshotDesktopBackend(
   }
   let buffer: Buffer
   try {
-    buffer = displayId === null ? await mod() : await mod({ screen: displayId })
+    // screenshot-desktop defaults to JPEG; da-mcp requires PNG (validatePngBuffer
+    // rejects any non-PNG buffer with SCREENSHOT_EMPTY). Always request PNG so
+    // the returned buffer survives magic-byte validation downstream.
+    const opts =
+      displayId === null ? { format: 'png' } : { screen: displayId, format: 'png' }
+    buffer = await mod(opts)
   } catch (err) {
     permissionErrorFor(err, 'screenshot-desktop capture')
     throw new DaMcpError('NATIVE_FAILED', 'screenshot-desktop capture failed', err)

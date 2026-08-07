@@ -174,3 +174,54 @@ describe('screenshot backends — empty buffer must surface, not silently swallo
     vi.doUnmock('screenshot-desktop')
   })
 })
+
+/**
+ * Regression test: screenshot-desktop returns JPEG by default
+ * (see node_modules/screenshot-desktop/README.md: "JPG output (by default)").
+ * da-mcp's dispatcher validates every capture with `validatePngBuffer`,
+ * which checks for the 8-byte PNG signature `89 50 4E 47 ...` and throws
+ * SCREENSHOT_EMPTY otherwise. Result without this fix: every screenshot
+ * call fails with the opaque `SCREENSHOT_EMPTY` error and every
+ * screenshot-dependent tool (da_ocr, da_verify_pixels, da_find_text,
+ * da_click_text, da_wait_for_text) is unusable.
+ *
+ * Fix: screenshotDesktopBackend now passes `{ format: 'png' }` (merged
+ * with `{ screen: displayId }` when displayId !== null) so the wrapper
+ * emits a PNG buffer that survives validatePngBuffer downstream.
+ */
+describe('screenshot backends — request PNG format from screenshot-desktop', () => {
+  it('screenshotDesktopBackend(null) requests format: "png"', async () => {
+    const mocked = vi.fn().mockResolvedValue(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    )
+    vi.doMock('screenshot-desktop', () => ({ default: mocked }))
+    const { screenshotDesktopBackend } = await import('../../src/screenshot/backends.js')
+    await screenshotDesktopBackend(null)
+    expect(mocked).toHaveBeenCalledTimes(1)
+    expect(mocked).toHaveBeenCalledWith({ format: 'png' })
+    vi.doUnmock('screenshot-desktop')
+  })
+
+  it('screenshotDesktopBackend(N) requests { screen: N, format: "png" }', async () => {
+    const mocked = vi.fn().mockResolvedValue(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    )
+    vi.doMock('screenshot-desktop', () => ({ default: mocked }))
+    const { screenshotDesktopBackend } = await import('../../src/screenshot/backends.js')
+    await screenshotDesktopBackend(2)
+    expect(mocked).toHaveBeenCalledTimes(1)
+    expect(mocked).toHaveBeenCalledWith({ screen: 2, format: 'png' })
+    vi.doUnmock('screenshot-desktop')
+  })
+
+  it('validatePngBuffer rejects a real JPEG buffer (JFIF signature 0xFF 0xD8 0xFF 0xE0)', () => {
+    // 20-byte slice that starts with the JFIF JPEG SOI+APP0 marker.
+    const jpegSlice = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+      0x00, 0x01, 0x01, 0x01, 0x00, 0x90, 0x00, 0x90, 0x00, 0x00,
+    ])
+    expect(() => validatePngBuffer(jpegSlice)).toThrow(DaMcpError)
+    expect(() => validatePngBuffer(jpegSlice)).toThrow(/Screenshot buffer invalid/)
+    expect(checkPngMagic(jpegSlice)).toBe(false)
+  })
+})
