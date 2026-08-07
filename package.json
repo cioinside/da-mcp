@@ -1,6 +1,6 @@
 {
   "name": "da-mcp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Crossplatform Desktop Automation MCP Server — screenshot, OCR with UI-element classification, mouse/keyboard control, program launch for AI agents on Linux/macOS/Windows",
   "type": "module",
   "engines": {
