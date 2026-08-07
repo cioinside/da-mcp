@@ -40,11 +40,11 @@ function runWithTransport(): Promise<void> {
 function resolveProjectRoot(): string {
   // For `node dist/server-dispatch.js` argv[1] is the script path; for a
   // Node SEA binary argv[1] is the first user argument (e.g. "upgrade"),
-  // so the dirname trick only works in source mode. dirname + ../../
+  // so the dirname trick only works in source mode. dirname + ../
   // lands on the repo root for source installs; for SEA it returns the
-  // binary's grandparent, but resolveProjectRoot is only consumed by
+  // binary's parent, but resolveProjectRoot is only consumed by
   // source-mode upgrade / install-service, which never run under SEA.
-  return path.resolve(path.dirname(process.argv[1] ?? process.execPath), '..', '..')
+  return path.resolve(path.dirname(process.argv[1] ?? process.execPath), '..')
 }
 
 function stdoutLine(msg: string): void {
