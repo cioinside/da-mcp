@@ -149,6 +149,12 @@ export async function screenshotDesktopBackend(
     permissionErrorFor(err, 'screenshot-desktop capture')
     throw new DaMcpError('NATIVE_FAILED', 'screenshot-desktop capture failed', err)
   }
+  if (buffer === null || buffer === undefined || buffer.length === 0) {
+    throw new DaMcpError(
+      'NATIVE_FAILED',
+      `screenshot-desktop returned ${buffer === null || buffer === undefined ? 'null' : '0 bytes'} for displayId=${String(displayId)}; falling back to next backend.`,
+    )
+  }
   return { buffer, source: 'screenshot-desktop', widthPx: 0, heightPx: 0 }
 }
 
@@ -181,5 +187,11 @@ export async function windowsCliBackend(): Promise<CaptureBlob> {
     timeoutMs: 30_000,
     context: 'PowerShell BitBlt',
   })
+  if (buffer.length === 0) {
+    throw new DaMcpError(
+      'NATIVE_FAILED',
+      'PowerShell BitBlt returned 0 bytes (TCC permission denied or session 0?).',
+    )
+  }
   return { buffer, source: 'windows-cli', widthPx: 0, heightPx: 0 }
 }

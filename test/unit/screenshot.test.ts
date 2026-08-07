@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import { DaMcpError } from '../../src/errors.js'
 import {
@@ -117,5 +117,60 @@ describe('isPermissionError (PERMISSION_DENIED detection)', () => {
     expect(isPermissionError('display not found')).toBe(false)
     expect(isPermissionError('no such file or directory')).toBe(false)
     expect(isPermissionError('')).toBe(false)
+  })
+})
+
+/**
+ * Regression test for v1.0.3 bug #22.
+ *
+ * `screenshotDesktopBackend` previously returned a 0-byte Buffer silently
+ * when the wrapper failed (TCC denial, session 0, etc.). The dispatcher
+ * then returned that empty buffer to `validatePngBuffer`, which threw
+ * opaque `SCREENSHOT_EMPTY` — no way for the user to know whether the
+ * display was missing, capture was denied, or the backend itself was
+ * broken.
+ *
+ * The fix: both `screenshotDesktopBackend` and `windowsCliBackend` now
+ * throw `NATIVE_FAILED` with a descriptive message when the underlying
+ * capture returns 0 bytes. The dispatcher in `dispatchCapture` already
+ * falls through to the next backend on non-terminal errors, so a
+ * failing screenshot-desktop naturally cascades to PowerShell BitBlt,
+ * and a failing PowerShell surfaces a real error string instead of
+ * `SCREENSHOT_EMPTY`.
+ */
+describe('screenshot backends — empty buffer must surface, not silently swallow (issue #22)', () => {
+  it('screenshotDesktopBackend throws NATIVE_FAILED when capture returns 0 bytes', async () => {
+    vi.doMock('screenshot-desktop', () => ({
+      default: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+    }))
+    const { screenshotDesktopBackend } = await import('../../src/screenshot/backends.js')
+    await expect(screenshotDesktopBackend(2)).rejects.toMatchObject({
+      code: 'NATIVE_FAILED',
+    })
+    await expect(screenshotDesktopBackend(2)).rejects.toThrow(/displayId=2/)
+    vi.doUnmock('screenshot-desktop')
+  })
+
+  it('screenshotDesktopBackend throws NATIVE_FAILED when capture returns null/undefined', async () => {
+    vi.doMock('screenshot-desktop', () => ({
+      default: vi.fn().mockResolvedValue(null),
+    }))
+    const { screenshotDesktopBackend } = await import('../../src/screenshot/backends.js')
+    await expect(screenshotDesktopBackend(null)).rejects.toMatchObject({
+      code: 'NATIVE_FAILED',
+    })
+    vi.doUnmock('screenshot-desktop')
+  })
+
+  it('screenshotDesktopBackend propagates a useful non-empty buffer', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
+    vi.doMock('screenshot-desktop', () => ({
+      default: vi.fn().mockResolvedValue(png),
+    }))
+    const { screenshotDesktopBackend } = await import('../../src/screenshot/backends.js')
+    const blob = await screenshotDesktopBackend(0)
+    expect(blob.source).toBe('screenshot-desktop')
+    expect(blob.buffer.length).toBe(png.length)
+    vi.doUnmock('screenshot-desktop')
   })
 })
