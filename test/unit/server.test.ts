@@ -15,7 +15,12 @@ import { McpServer, InMemoryTransport } from '@modelcontextprotocol/server'
 import { initConfig, resetConfig } from '../../src/config.js'
 import { DaMcpError } from '../../src/errors.js'
 import { ALL_TOOLS } from '../../src/tools/index.js'
-import { createMcpServer, wrapHandlerResult } from '../../src/server.js'
+import {
+  createMcpServer,
+  wrapHandlerResult,
+  installProcessSafetyNet,
+  uninstallProcessSafetyNet,
+} from '../../src/server.js'
 import { SERVER_INSTRUCTIONS } from '../../src/server-instructions.js'
 
 const TRACKED = ['DA_MCP_TEST_MODE'] as const
@@ -232,5 +237,50 @@ describe('transport lifecycle', () => {
     expect(aReg).not.toBe(bReg)
     expect(Object.keys(aReg).length).toBe(20)
     expect(Object.keys(bReg).length).toBe(20)
+  })
+})
+
+// Regression for issue #29: tesseract.js's Worker 'error' re-thrown on
+// nextTick used to exit the daemon and take down every MCP client.
+describe('installProcessSafetyNet (issue #29 regression)', () => {
+  afterEach(() => {
+    uninstallProcessSafetyNet()
+  })
+
+  it('adds one uncaughtException + one unhandledRejection listener', () => {
+    const beforeU = process.listenerCount('uncaughtException')
+    const beforeR = process.listenerCount('unhandledRejection')
+    installProcessSafetyNet()
+    expect(process.listenerCount('uncaughtException')).toBe(beforeU + 1)
+    expect(process.listenerCount('unhandledRejection')).toBe(beforeR + 1)
+  })
+
+  it('is idempotent — second call does not double-register', () => {
+    installProcessSafetyNet()
+    const afterU = process.listenerCount('uncaughtException')
+    const afterR = process.listenerCount('unhandledRejection')
+    installProcessSafetyNet()
+    installProcessSafetyNet()
+    expect(process.listenerCount('uncaughtException')).toBe(afterU)
+    expect(process.listenerCount('unhandledRejection')).toBe(afterR)
+  })
+
+  it('uninstallProcessSafetyNet removes exactly the installed listeners', () => {
+    const beforeU = process.listenerCount('uncaughtException')
+    const beforeR = process.listenerCount('unhandledRejection')
+    installProcessSafetyNet()
+    uninstallProcessSafetyNet()
+    expect(process.listenerCount('uncaughtException')).toBe(beforeU)
+    expect(process.listenerCount('unhandledRejection')).toBe(beforeR)
+  })
+
+  it('installed listener catches an uncaughtException without exiting the process', async () => {
+    installProcessSafetyNet()
+    // Without the safety net, Node prints a stack trace and exits; with it,
+    // the handler just logs.
+    process.emit('uncaughtException', new Error('synthetic-test'))
+    // Yield so the listener logs before the assertion below.
+    await new Promise((r) => setImmediate(r))
+    expect(process.listenerCount('uncaughtException')).toBeGreaterThan(0)
   })
 })

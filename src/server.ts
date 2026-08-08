@@ -158,11 +158,62 @@ function installShutdown(server: McpServer): {
   return { closed, trigger }
 }
 
+// Module-local handle for installProcessSafetyNet(); null when not installed.
+let safetyNetInstalled: {
+  uncaught: NodeJS.UncaughtExceptionListener
+  unhandled: NodeJS.UnhandledRejectionListener
+} | null = null
+
+/**
+ * Install process-level uncaughtException + unhandledRejection handlers that
+ * LOG and CONTINUE running instead of letting Node 15+ exit on default.
+ *
+ * Why: a long-lived MCP daemon must survive any single tool handler's
+ * bookkeeping mistake — see issue #29, where tesseract.js's createWorker
+ * throws on process.nextTick when its internal Worker rejects a job
+ * (tesseract.js does not register an 'error' listener on its own Worker).
+ * Without this net that nextTick throw exits the process and every
+ * `da_*` tool reports "tool unavailable" until the daemon is restarted.
+ * Idempotent: a second call is a no-op.
+ */
+export function installProcessSafetyNet(): {
+  uncaught: NodeJS.UncaughtExceptionListener
+  unhandled: NodeJS.UnhandledRejectionListener
+} {
+  if (safetyNetInstalled !== null) return safetyNetInstalled
+  const uncaught: NodeJS.UncaughtExceptionListener = (err) => {
+    getLogger().error('uncaughtException in da-mcp daemon (survived; no exit)', {
+      context: {
+        err: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      },
+    })
+  }
+  const unhandled: NodeJS.UnhandledRejectionListener = (reason) => {
+    getLogger().error('unhandledRejection in da-mcp daemon (survived; no exit)', {
+      context: { reason: reason instanceof Error ? reason.message : String(reason) },
+    })
+  }
+  process.on('uncaughtException', uncaught)
+  process.on('unhandledRejection', unhandled)
+  safetyNetInstalled = { uncaught, unhandled }
+  return safetyNetInstalled
+}
+
+/** Test-only: remove the safety-net listeners installed by installProcessSafetyNet. */
+export function uninstallProcessSafetyNet(): void {
+  if (safetyNetInstalled === null) return
+  process.removeListener('uncaughtException', safetyNetInstalled.uncaught)
+  process.removeListener('unhandledRejection', safetyNetInstalled.unhandled)
+  safetyNetInstalled = null
+}
+
 /**
  * Boot over stdio, install signal handlers, resolve on close / reject on
  * connect failure.
  */
 export function runServer(): Promise<void> {
+  installProcessSafetyNet()
   try {
     getConfig()
   } catch (err) {
@@ -194,6 +245,7 @@ export function runServer(): Promise<void> {
  * Boot over HTTP with token-in-path auth; resolves on SIGINT/SIGTERM close.
  */
 export function runHttpServer(): Promise<void> {
+  installProcessSafetyNet()
   const cfg = (() => {
     try {
       return getConfig()

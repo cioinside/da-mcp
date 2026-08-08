@@ -126,6 +126,11 @@ export async function runWasm(image: Buffer, lang: string): Promise<OCRResult> {
   try {
     await fs.writeFile(tmpFile, image)
     worker = await mod.createWorker(lang)
+    // No-op 'error' listener prevents tesseract.js's internal Worker from
+    // throwing on nextTick when a job is rejected (issue #29). The
+    // tesseract.js Worker type omits .on() but the runtime value is an
+    // EventEmitter.
+    ;(worker as unknown as NodeJS.EventEmitter).on('error', () => undefined)
     // Default output in tesseract.js@7 is `{ text: true }` only — `data.blocks`
     // is null without this flag. Request both so we can flatten the hierarchy.
     const result = await worker.recognize(tmpFile, {}, { text: true, blocks: true })
