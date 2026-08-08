@@ -141,6 +141,9 @@ curl.exe -L -o da-mcp.exe https://github.com/cioinside/da-mcp/releases/latest/do
 
 # Run stdio MCP server (default — point your MCP client at this binary)
 .\da-mcp.exe
+
+# Optional: install Tesseract OCR CLI for fast OCR (auto-elevates via UAC)
+.\da-mcp.exe install-tesseract
 ```
 
 **Caveats:**
@@ -165,7 +168,7 @@ If all backends fail, `da_ocr` returns `OCR_FAILED` with a multi-line remediatio
 
 | OS | Command |
 |---|---|
-| Windows | `winget install UB-Mannheim.TesseractOCR` (or `choco install tesseract`) |
+| Windows | `winget install UB-Mannheim.TesseractOCR` (or `choco install tesseract`). For the single-binary release, you can also run `.\da-mcp.exe install-tesseract` — it auto-detects winget/choco and re-launches itself elevated via UAC if needed. |
 | macOS | `brew install tesseract` |
 | Linux | `apt install tesseract-ocr` (Debian/Ubuntu) / `dnf install tesseract` (Fedora) / `pacman -S tesseract` (Arch) |
 
@@ -383,7 +386,7 @@ npx vitest
 ### Test inventory
 
 - **28 unit test files + 2 e2e** (e2e skip in mock mode)
-- **415 tests passing / 18 skipped / 0 failed** in `DA_MCP_TEST_MODE=mock npm test` (e2e require real X11/tesseract; input dispatcher tests cover per-OS stubs for macOS + Windows PowerShell paths). Post-tool additions: `da_find_text`, `da_wait_for_window`, `da_wait_for_text`, `da_verify_pixels` bring the total to 471 passing.
+- **540 tests passing / 18 skipped / 0 failed** in `DA_MCP_TEST_MODE=mock npm test` (e2e require real X11/tesseract; input dispatcher tests cover per-OS stubs for macOS + Windows PowerShell paths). Post-tool additions: `da_find_text`, `da_wait_for_window`, `da_wait_for_text`, `da_verify_pixels`, `install-tesseract` CLI subcommand bring the total to 540 passing.
 - **Test runtime**: `process.env['DA_MCP_TEST_MODE'] === 'mock'` short-circuits native calls; `_mock.ts` modules inject deterministic native modules
 
 ### Conventions

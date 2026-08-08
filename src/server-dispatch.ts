@@ -27,6 +27,7 @@ import { runUpgrade, type UpgradeResult } from './cli/upgrade.js'
 import { runUpgradeBinary, type UpgradeBinaryResult, defaultFs } from './cli/upgrade-binary.js'
 import { installService } from './cli/install-service.js'
 import { uninstallService } from './cli/install-service.js'
+import { runInstallTesseract } from './cli/install-tesseract.js'
 
 function readTransportFromEnv(): 'stdio' | 'http' {
   return process.env['DA_MCP_TRANSPORT'] === 'http' ? 'http' : 'stdio'
@@ -180,6 +181,23 @@ export function runCli(argv: readonly string[]): Promise<void> {
       stdoutLine(`da-mcp service removed for ${r.platform}.`)
     })
   }
+  if (argv[2] === 'install-tesseract') {
+    return runInstallTesseract({
+      exec: defaultExec(),
+      log: stdoutLine,
+      platform: process.platform,
+      execPath: process.execPath,
+      extraArgs: argv.slice(3),
+    }).then((r) => {
+      if (r.alreadyInstalled) {
+        stdoutLine(`tesseract already installed (${r.tesseractPath}).`)
+      } else if (r.elevated) {
+        stdoutLine('da-mcp relaunched with admin elevation to complete the install; see the UAC prompt.')
+      } else if (r.installed) {
+        stdoutLine(`tesseract installed via ${r.packageManager}. Restart any active da_ocr calls.`)
+      }
+    })
+  }
   if (argv[2] === 'help' || argv[2] === '--help' || argv[2] === '-h') {
     printUsage()
     return Promise.resolve()
@@ -198,6 +216,7 @@ function printUsage(): void {
       '  node dist/server-dispatch.js upgrade [--force]   self-update (source: git pull + rebuild; binary: replace from latest GitHub release)',
       '  node dist/server-dispatch.js install-service     register systemd / launchd / Windows service',
       '  node dist/server-dispatch.js uninstall-service   remove the registered service',
+      '  node dist/server-dispatch.js install-tesseract   install the Tesseract OCR CLI (Windows; auto-elevates via UAC)',
       '  node dist/server-dispatch.js help                show this message',
       '',
       'Environment variables:',

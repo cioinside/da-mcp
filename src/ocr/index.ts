@@ -8,6 +8,7 @@
 import { Buffer } from 'node:buffer'
 import { DaMcpError } from '../errors.js'
 import { getConfig } from '../config.js'
+import { getLogger } from '../log.js'
 import { runCli } from './cli.js'
 import { mockResult } from './mock.js'
 import type { OCRResult } from './types.js'
@@ -57,6 +58,18 @@ export async function runOcr(opts: {
   try {
     return await runCli(image, lang, cfg.subprocessTimeoutMs)
   } catch (cliErr) {
+    if (cliErr instanceof DaMcpError && cliErr.code === 'NATIVE_MISSING') {
+      getLogger().info(
+        `tesseract CLI not found on PATH; using bundled WASM fallback (slower). ` +
+          `Run 'da-mcp.exe install-tesseract' for fast OCR (~0.5-2s vs ~5-15s/call).`,
+        { component: 'ocr' },
+      )
+    } else {
+      getLogger().warn(
+        `tesseract CLI failed; falling back to WASM: ${cliErr instanceof Error ? cliErr.message : String(cliErr)}`,
+        { component: 'ocr' },
+      )
+    }
     try {
       return await runWasm(image, lang)
     } catch (wasmErr) {
