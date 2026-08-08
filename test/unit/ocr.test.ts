@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { initConfig, getConfig, resetConfig } from '../../src/config.js'
 import { DaMcpError } from '../../src/errors.js'
-import { runOcr } from '../../src/ocr/index.js'
+import { runOcr, buildOcrFailed } from '../../src/ocr/index.js'
 import { runCli } from '../../src/ocr/cli.js'
 import { classifyUiElements } from '../../src/ocr/classify.js'
 import type { OCRLine, UIElement } from '../../src/ocr/types.js'
@@ -182,6 +182,14 @@ describe('runOcr OCR_FAILED (CLI ENOENT + wasm unavailable)', () => {
       assertCode(caught, 'OCR_FAILED')
       if (DaMcpError.is(caught)) {
         expect(caught.message).toContain('OCR failed')
+        expect(caught.message).toContain('Install Tesseract')
+        expect(caught.message).toContain('winget install UB-Mannheim.TesseractOCR')
+        expect(caught.message).toContain('brew install tesseract')
+        expect(caught.message).toContain('apt install tesseract-ocr')
+        expect(caught.message).toContain('~15 MB')
+        expect(caught.message).toContain('DA_MCP_TESSDATA_DIR')
+        expect(caught.message).toMatch(/Tesseract CLI: /)
+        expect(caught.message).toMatch(/WASM fallback: /)
         expect(caught.cause).toBeInstanceOf(Error)
       }
     } finally {
@@ -190,6 +198,45 @@ describe('runOcr OCR_FAILED (CLI ENOENT + wasm unavailable)', () => {
       resetConfig()
       initConfig({ DA_MCP_TEST_MODE: 'mock' })
     }
+  })
+})
+
+describe('buildOcrFailed (OCR_FAILED message builder)', () => {
+  it('produces DaMcpError OCR_FAILED with both backend messages and remediation hints', () => {
+    const cliErr = new Error('tesseract CLI not found on PATH. Install with: apt-get install tesseract-ocr')
+    const wasmErr = new Error('Failed to fetch traineddata: network unreachable')
+    const out = buildOcrFailed(cliErr, wasmErr)
+    expect(out).toBeInstanceOf(DaMcpError)
+    expect(out.code).toBe('OCR_FAILED')
+    expect(out.cause).toBe(cliErr)
+    expect(out.message).toContain('OCR failed.')
+    expect(out.message).toContain(cliErr.message)
+    expect(out.message).toContain(wasmErr.message)
+    expect(out.message).toContain('winget install UB-Mannheim.TesseractOCR')
+    expect(out.message).toContain('brew install tesseract')
+    expect(out.message).toContain('apt install tesseract-ocr')
+    expect(out.message).toContain('internet access')
+    expect(out.message).toContain('DA_MCP_TESSDATA_DIR')
+  })
+
+  it('coerces non-Error cliErr / wasmErr to string for the message', () => {
+    const out = buildOcrFailed('plain string cliErr', { code: 'ECONNRESET' })
+    expect(out.code).toBe('OCR_FAILED')
+    expect(out.message).toContain('plain string cliErr')
+    expect(out.message).toContain('[object Object]')
+    expect(out.cause).toBe('plain string cliErr')
+  })
+
+  it('handles null / undefined error values without throwing', () => {
+    expect(() => buildOcrFailed(null, undefined)).not.toThrow()
+    const out = buildOcrFailed(null, undefined)
+    expect(out.code).toBe('OCR_FAILED')
+    expect(out.message).toContain('null')
+    expect(out.message).toContain('undefined')
+  })
+
+  it('exported from src/ocr/index.js', () => {
+    expect(typeof buildOcrFailed).toBe('function')
   })
 })
 
