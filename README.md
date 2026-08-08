@@ -130,7 +130,7 @@ For manual / sandboxed installs where you cannot run the scripts, see [Install](
 
 ## Install (Windows, single-binary)
 
-For Windows users, a self-contained single-binary release is available — no Node.js, no `npm install`, no build step. The binary embeds Node 22 + the bundled JavaScript via Node SEA (`scripts/build-sea.sh`); **the only system requirement is [`tesseract`](https://github.com/UB-Mannheim/tesseract) on `$PATH`** (for OCR).
+For Windows users, a self-contained single-binary release is available — no Node.js, no `npm install`, no build step. The binary embeds Node 22 + the bundled JavaScript via Node SEA (`scripts/build-sea.sh`); the recommended system dependency is [`tesseract`](https://github.com/UB-Mannheim/tesseract) on `$PATH` (for fast OCR — see [OCR backend fallback](#ocr-backend-fallback) below).
 
 ```powershell
 # Download latest release asset from GitHub
@@ -146,8 +146,30 @@ curl.exe -L -o da-mcp.exe https://github.com/cioinside/da-mcp/releases/latest/do
 **Caveats:**
 
 - **Unsigned binary** — `postject` strips Authenticode when injecting the SEA blob, so Windows SmartScreen will warn on first launch. Click "More info" → "Run anyway".
-- **No native NAPI deps** — `screenshot-desktop`, MCP SDK, `zod` are all inlined in the binary. Only `tesseract` is external.
+- **No native NAPI deps** — `screenshot-desktop`, MCP SDK, `zod`, `tesseract.js` are all inlined in the binary. Only `tesseract` is recommended (for fast OCR; not required — see [OCR backend fallback](#ocr-backend-fallback)).
 - **Linux + macOS binaries are not part of the v1.0.0 release** — see [`BUILD.md`](BUILD.md) for the local cross-platform build path (Windows SEA build runs on `windows-latest` CI only).
+
+### OCR backend fallback
+
+`da_ocr` tries backends in order; the first one that succeeds is used:
+
+| Order | Backend | Speed | Requires | Used when |
+|---|---|---|---|---|
+| 1 | Tesseract CLI (`tesseract` on `$PATH`) | ~0.5–2 s / screenshot | `tesseract` installed | Recommended path |
+| 2 | tesseract.js WASM (in-binary, with pre-bundled `eng.traineddata`) | ~5–15 s / screenshot | Nothing — runs offline | Tesseract not installed |
+| 3 | tesseract.js WASM (downloads traineddata) | ~15–30 s on first call, then ~5–15 s | Internet on first call | tesseract.js fallback if no pre-bundled data |
+
+If all backends fail, `da_ocr` returns `OCR_FAILED` with a multi-line remediation hint pointing you to the install command for your platform.
+
+**Install Tesseract for fast OCR (recommended):**
+
+| OS | Command |
+|---|---|
+| Windows | `winget install UB-Mannheim.TesseractOCR` (or `choco install tesseract`) |
+| macOS | `brew install tesseract` |
+| Linux | `apt install tesseract-ocr` (Debian/Ubuntu) / `dnf install tesseract` (Fedora) / `pacman -S tesseract` (Arch) |
+
+Configure the tessdata cache directory with `DA_MCP_TESSDATA_DIR` (default `./tessdata` — relative to the process CWD).
 
 For source installs (Linux/macOS/Windows dev workflow), continue to [Install](#install) below.
 

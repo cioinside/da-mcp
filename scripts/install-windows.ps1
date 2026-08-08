@@ -169,8 +169,8 @@ if ($needsNode) {
     }
 }
 
-# ─── Step 3: tesseract ───────────────────────────────────────────────────────
-Write-Step 3 6 'Checking tesseract...'
+# ─── Step 3: tesseract (recommended for fast OCR; not required) ──────────────
+Write-Step 3 6 'Checking tesseract (recommended for fast OCR; not required)...'
 $tesseractInstalled = $false
 try {
     $tessOut = & tesseract --version 2>&1 | Select-Object -First 1
@@ -182,15 +182,18 @@ try {
 
 if (-not $tesseractInstalled) {
     if ($SkipSystemDeps) {
-        Write-Warn 'tesseract not found. da_ocr will use WASM fallback (slower).'
-        Write-Info 'Install manually:  winget install --id UB-Mannheim.TesseractOCR'
+        Write-Warn 'tesseract not found. da_ocr will use the bundled tesseract.js WASM fallback (slower than CLI but works offline).'
+        Write-Info 'Install manually later for faster OCR:  winget install --id UB-Mannheim.TesseractOCR'
     } else {
+        Write-Info 'tesseract not found — installing (recommended for fast OCR).'
+        Write-Info 'If install fails, da_ocr falls back to the bundled tesseract.js WASM (slower, but works offline).'
         try {
             Install-Package -PackageId 'UB-Mannheim.TesseractOCR'
             Write-Success 'tesseract installed'
         } catch {
             Write-Warn "tesseract install failed (continuing): $_"
-            Write-Info 'da_ocr will use WASM fallback. To install later: winget install --id UB-Mannheim.TesseractOCR'
+            Write-Info 'da_ocr will use the bundled tesseract.js WASM fallback.'
+            Write-Info 'To install later: winget install --id UB-Mannheim.TesseractOCR'
         }
     }
 }
