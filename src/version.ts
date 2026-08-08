@@ -5,7 +5,7 @@
  */
 
 export const SERVER_NAME = 'da-mcp' as const
-export const SERVER_VERSION = '0.1.11' as const
+export const SERVER_VERSION = '0.1.12' as const
 export const PROTOCOL_VERSION = '2026-07-28' as const
 
 export type ServerVersion = typeof SERVER_VERSION
