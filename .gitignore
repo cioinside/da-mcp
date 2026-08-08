@@ -7,7 +7,12 @@ coverage/
 .env.local
 tessdata/
 .tess-cache/
-/tmp/da-mcp-*.png
+
+# Bundled SEA assets — the traineddata binary is committed (sea build inlines
+# it via --define); ignore everything else under assets/.
+assets/*
+!assets/*.traineddata
+!/tmp/da-mcp-*.png
 /tmp/da-mcp-*.json
 /tmp/da-mcp-*.jsonl
 /tmp/da-mcp-manual-qa/

@@ -64,13 +64,36 @@ mkdir -p "$ARTIFACT_DIR"
 # version to the latest GitHub release tag.
 DA_MCP_VERSION="$(node -p "require('./package.json').version")"
 export DA_MCP_VERSION
-npx --yes esbuild src/server-dispatch.ts \
-  --bundle \
-  --platform=node \
-  --target=node22 \
-  --format=cjs \
-  --define:process.env.DA_MCP_VERSION="\"${DA_MCP_VERSION}\"" \
-  --outfile="$BUNDLE"
+
+# Base64-encode the tesseract traineddata so the WASM backend in the SEA
+# binary can run OCR offline on first use. The encoded string is passed
+# into esbuild via the config file (`sea-esbuild.config.mjs`) — the CLI
+# flag approach would blow past ARG_MAX (~2 MB on Linux) for a ~30 MB
+# base64 payload. The corresponding consumer is
+# `src/ocr/bundled-tessdata.ts:ensureBundledTessdata()`.
+TESSDATA_FILE="assets/eng.traineddata"
+TESSDATA_B64_FILE="dist-sea/_bundled-tessdata.b64"
+DA_MCP_BUNDLED_TESSDATA_B64=""
+mkdir -p "$(dirname "$TESSDATA_B64_FILE")"
+if [ -f "$TESSDATA_FILE" ]; then
+  RAW_BYTES="$(stat -c%s "$TESSDATA_FILE")"
+  # base64 → file (not env var) — a 30 MB env var would blow ARG_MAX (~2 MB
+  # on Linux) at every npx → node → esbuild exec hop. The file is read once
+  # by `sea-esbuild.config.mjs` and removed below.
+  base64 -w0 "$TESSDATA_FILE" > "$TESSDATA_B64_FILE"
+  B64_BYTES="$(stat -c%s "$TESSDATA_B64_FILE")"
+  echo "Bundling traineddata: ${RAW_BYTES} bytes (raw) / ${B64_BYTES} bytes (base64)"
+else
+  echo "WARNING: $TESSDATA_FILE not found; SEA OCR will require network on first use" >&2
+  : > "$TESSDATA_B64_FILE"
+fi
+
+export SEA_BUNDLED_TESSDATA_FILE="$TESSDATA_B64_FILE"
+export SEA_BUNDLE_OUT="$BUNDLE"
+# Use the esbuild JS API wrapper at the repo root — esbuild 0.28's CLI does
+# NOT auto-discover config files and the CLI --define flag would blow ARG_MAX.
+node esbuild.config.mjs
+rm -f "$TESSDATA_B64_FILE"
 
 NODE_BIN="$(command -v node)"
 if [ -z "$NODE_BIN" ]; then

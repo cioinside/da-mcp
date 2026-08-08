@@ -13,6 +13,8 @@
  * then flatten Page → OCRLine/OCRWord for the existing pipeline.
  */
 import { DaMcpError } from '../errors.js'
+import { getConfig } from '../config.js'
+import { ensureBundledTessdata } from './bundled-tessdata.js'
 import type { OCRLine, OCRResult, OCRWord } from './types.js'
 
 /**
@@ -125,7 +127,20 @@ export async function runWasm(image: Buffer, lang: string): Promise<OCRResult> {
   let worker: Awaited<ReturnType<typeof mod.createWorker>> | null = null
   try {
     await fs.writeFile(tmpFile, image)
-    worker = await mod.createWorker(lang)
+    // In the SEA binary, the traineddata is base64-bundled at build time and
+    // needs to be extracted to disk so tesseract.js can find it without
+    // hitting the network. In source dev mode (no --define) the helper is a
+    // no-op and tesseract.js falls back to its own download path.
+    const tessdataDir = getConfig().tessdataDir
+    await ensureBundledTessdata(tessdataDir, lang).catch(() => undefined)
+    // OEM 1 = LSTM only — matches the traineddata bundled at build time and
+    // skips the legacy tesseract engine which would error against modern data.
+    // langPath/cachePath both point at tessdataDir so tesseract.js picks the
+    // extracted file and doesn't try to redownload it.
+    worker = await mod.createWorker(lang, 1, {
+      langPath: tessdataDir,
+      cachePath: tessdataDir,
+    })
     // No-op 'error' listener prevents tesseract.js's internal Worker from
     // throwing on nextTick when a job is rejected (issue #29). The
     // tesseract.js Worker type omits .on() but the runtime value is an
